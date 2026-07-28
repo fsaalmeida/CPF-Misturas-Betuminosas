@@ -1746,6 +1746,7 @@ function App() {
         {
           users,
           isAdmin,
+          currentUserRole: currentUser?.role,
           onAdd: () => setModal({ type: "user" }),
           onEdit: (u) => setModal({ type: "user", data: u }),
           onDelete: deleteUser,
@@ -1971,7 +1972,7 @@ function App() {
         }
       )
     ] }),
-    modal?.type === "user" && /* @__PURE__ */ jsx(UserModal, { data: modal.data, centers, isAdmin, onSave: saveUser, onResetPin: resetUserPin, onSetPin: setUserPin, onClose: () => setModal(null) }),
+    modal?.type === "user" && /* @__PURE__ */ jsx(UserModal, { data: modal.data, centers, isAdmin, currentUserRole: currentUser?.role, onSave: saveUser, onResetPin: resetUserPin, onSetPin: setUserPin, onClose: () => setModal(null) }),
     modal?.type === "logotipo" && /* @__PURE__ */ jsx(LogotipoModal, { logotipoAtual: logotipo, onSave: saveLogotipo, onRemove: removeLogotipo, onClose: () => setModal(null) }),
     modal?.type === "dopConfig" && /* @__PURE__ */ jsx(DopConfigModal, { dopConfig, onSave: saveDopConfig, onClose: () => setModal(null) }),
     modal?.type === "backup" && /* @__PURE__ */ jsx(BackupModal, { onExport: exportarBackupCompleto, onImport: importarBackupCompleto, onClose: () => setModal(null) }),
@@ -2205,11 +2206,12 @@ function SetupForm({ onSubmit }) {
     /* @__PURE__ */ jsx("button", { onClick: submit, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700", children: "Criar Administrador" })
   ] });
 }
-function UsersView({ users, isAdmin, onAdd, onEdit, onDelete, onBack }) {
+function UsersView({ users, isAdmin, currentUserRole, onAdd, onEdit, onDelete, onBack }) {
   const scopeText = { "Gestor": "Todos os centros", "Operador": "Por calend\xE1rio", "Or\xE7amentista": "Apenas consulta", "Convidado": "Apenas consulta" };
   const usersOrdenados = [...users].sort(
     (a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role) || (a.nome || "").localeCompare(b.nome || "", "pt", { sensitivity: "base" })
   );
+  const podeEditar = (u) => isAdmin || currentUserRole === "Gestor" && u.role === "Operador";
   return /* @__PURE__ */ jsxs("div", { className: "p-8 max-w-4xl", children: [
     /* @__PURE__ */ jsxs("button", { onClick: onBack, className: "flex items-center gap-1 text-sm text-stone-500 hover:text-amber-600 mb-6 font-medium", children: [
       /* @__PURE__ */ jsx(ChevronLeft, { size: 16 }),
@@ -2220,7 +2222,7 @@ function UsersView({ users, isAdmin, onAdd, onEdit, onDelete, onBack }) {
         /* @__PURE__ */ jsx("p", { className: "font-display text-xs tracking-[0.2em] text-amber-600 uppercase mb-1", children: "Equipa" }),
         /* @__PURE__ */ jsx("h2", { className: "font-display text-2xl text-stone-900 font-semibold", children: "Utilizadores" })
       ] }),
-      /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
+      isAdmin && /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
         /* @__PURE__ */ jsx(Plus, { size: 16 }),
         " Novo Utilizador"
       ] })
@@ -2236,7 +2238,7 @@ function UsersView({ users, isAdmin, onAdd, onEdit, onDelete, onBack }) {
         ] })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "flex gap-1", children: [
-        /* @__PURE__ */ jsx("button", { onClick: () => onEdit(u), className: "p-2 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg", children: /* @__PURE__ */ jsx(Pencil, { size: 16 }) }),
+        podeEditar(u) && /* @__PURE__ */ jsx("button", { onClick: () => onEdit(u), title: isAdmin ? "Editar" : "Gerir calend\xE1rio de acessos", className: "p-2 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg", children: isAdmin ? /* @__PURE__ */ jsx(Pencil, { size: 16 }) : /* @__PURE__ */ jsx(ClipboardList, { size: 16 }) }),
         isAdmin && /* @__PURE__ */ jsx("button", { onClick: () => onDelete(u.id), className: "p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg", children: /* @__PURE__ */ jsx(Trash2, { size: 16 }) })
       ] })
     ] }, u.id)) })
@@ -5368,7 +5370,7 @@ function DopConfigModal({ dopConfig, onSave, onClose }) {
     /* @__PURE__ */ jsx("button", { onClick: submit, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700", children: "Guardar" })
   ] });
 }
-function UserModal({ data, centers, isAdmin, onSave, onResetPin, onSetPin, onClose }) {
+function UserModal({ data, centers, isAdmin, currentUserRole, onSave, onResetPin, onSetPin, onClose }) {
   const [nome, setNome] = useState(data?.nome || "");
   const [primeiroNome, setPrimeiroNome] = useState(data?.primeiroNome || "");
   const [ultimoNome, setUltimoNome] = useState(data?.ultimoNome || "");
@@ -5383,6 +5385,7 @@ function UserModal({ data, centers, isAdmin, onSave, onResetPin, onSetPin, onClo
   const [novoPin, setNovoPin] = useState("");
   const [pinDefinido, setPinDefinido] = useState(false);
   const fileInputRef = useRef(null);
+  const soCalendario = !isAdmin && currentUserRole === "Gestor" && data?.role === "Operador";
   const submitNovoPin = () => {
     if (!/^\d{4}$/.test(novoPin)) return setError("A palavra-passe tem de ter exatamente 4 d\xEDgitos");
     onSetPin(data.id, novoPin);
@@ -5418,7 +5421,6 @@ function UserModal({ data, centers, isAdmin, onSave, onResetPin, onSetPin, onClo
       role,
       escalasCentros: role === "Operador" ? escalasFinais : []
     };
-    console.log("[DIAGN\xD3STICO] A gravar utilizador:", JSON.stringify(payload));
     onSave(payload);
   };
   const addEscala = () => {
@@ -5440,35 +5442,42 @@ function UserModal({ data, centers, isAdmin, onSave, onResetPin, onSetPin, onClo
     "Convidado": "Acesso de consulta apenas \u2014 n\xE3o cria nem edita nada na aplica\xE7\xE3o."
   };
   return /* @__PURE__ */ jsxs(Modal, { title: data?.id ? "Editar Utilizador" : "Novo Utilizador", subtitle: "Equipa", onClose, children: [
-    /* @__PURE__ */ jsxs(Field, { label: "Nome", children: [
-      /* @__PURE__ */ jsx("input", { value: nome, onChange: (e) => setNome(e.target.value), className: inputCls, placeholder: "Nome completo", autoFocus: true }),
-      /* @__PURE__ */ jsx("span", { className: "block text-xs text-stone-400 mt-1", children: "Este nome \xE9 tamb\xE9m o nome de utilizador usado para entrar na aplica\xE7\xE3o." })
+    soCalendario && /* @__PURE__ */ jsxs("div", { className: "bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 mb-4", children: [
+      /* @__PURE__ */ jsx("p", { className: "text-sm font-semibold text-stone-800", children: nome }),
+      email && /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-500", children: email }),
+      /* @__PURE__ */ jsx("p", { className: "text-xs text-amber-700 mt-1", children: "S\xF3 pode gerir o calend\xE1rio de acesso aos centros desta pessoa \u2014 para alterar nome, email ou perfil, pe\xE7a a um Administrador." })
     ] }),
-    /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
-      /* @__PURE__ */ jsx(Field, { label: "Primeiro Nome (opcional)", children: /* @__PURE__ */ jsx("input", { value: primeiroNome, onChange: (e) => setPrimeiroNome(e.target.value), className: inputCls, placeholder: "Ex: Jo\xE3o" }) }),
-      /* @__PURE__ */ jsx(Field, { label: "\xDAltimo Nome (opcional)", children: /* @__PURE__ */ jsx("input", { value: ultimoNome, onChange: (e) => setUltimoNome(e.target.value), className: inputCls, placeholder: "Ex: Silva" }) })
-    ] }),
-    /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 -mt-2 mb-4", children: "Usados s\xF3 para a assinatura manuscrita dos documentos (Di\xE1ria, etc.) \u2014 n\xE3o afetam o login." }),
-    /* @__PURE__ */ jsxs(Field, { label: "Email", children: [
-      /* @__PURE__ */ jsx("input", { value: email, onChange: (e) => setEmail(e.target.value), type: "email", className: inputCls, placeholder: "nome@empresa.pt" }),
-      /* @__PURE__ */ jsx("span", { className: "block text-xs text-stone-400 mt-1", children: "Usado como contacto/identifica\xE7\xE3o." })
-    ] }),
-    /* @__PURE__ */ jsxs(Field, { label: "Assinatura", children: [
-      /* @__PURE__ */ jsxs("div", { onClick: () => fileInputRef.current?.click(), className: "border border-dashed border-stone-300 rounded-lg p-4 text-center cursor-pointer hover:bg-stone-50", children: [
-        assinatura ? /* @__PURE__ */ jsx("img", { src: assinatura, alt: "Assinatura", className: "max-h-16 mx-auto" }) : /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400", children: "Clique para carregar uma imagem da assinatura (PNG, at\xE9 500 KB)" }),
-        /* @__PURE__ */ jsx("input", { ref: fileInputRef, type: "file", accept: "image/*", onChange: handleAssinaturaFile, className: "hidden" })
+    !soCalendario && /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsxs(Field, { label: "Nome", children: [
+        /* @__PURE__ */ jsx("input", { value: nome, onChange: (e) => setNome(e.target.value), className: inputCls, placeholder: "Nome completo", autoFocus: true }),
+        /* @__PURE__ */ jsx("span", { className: "block text-xs text-stone-400 mt-1", children: "Este nome \xE9 tamb\xE9m o nome de utilizador usado para entrar na aplica\xE7\xE3o." })
       ] }),
-      /* @__PURE__ */ jsxs("span", { className: "block text-xs text-stone-400 mt-1", children: [
-        "Sem assinatura carregada, os documentos usam o ",
-        primeiroNome || ultimoNome ? `nome (${`${primeiroNome} ${ultimoNome}`.trim()})` : "nome de login",
-        " num estilo manuscrito, a azul."
+      /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+        /* @__PURE__ */ jsx(Field, { label: "Primeiro Nome (opcional)", children: /* @__PURE__ */ jsx("input", { value: primeiroNome, onChange: (e) => setPrimeiroNome(e.target.value), className: inputCls, placeholder: "Ex: Jo\xE3o" }) }),
+        /* @__PURE__ */ jsx(Field, { label: "\xDAltimo Nome (opcional)", children: /* @__PURE__ */ jsx("input", { value: ultimoNome, onChange: (e) => setUltimoNome(e.target.value), className: inputCls, placeholder: "Ex: Silva" }) })
       ] }),
-      assinatura && /* @__PURE__ */ jsx("button", { type: "button", onClick: () => setAssinatura(""), className: "text-xs text-red-600 hover:text-red-700 mt-1", children: "Remover assinatura" })
-    ] }),
-    /* @__PURE__ */ jsx(Field, { label: "Perfil", children: /* @__PURE__ */ jsx("select", { value: role, onChange: (e) => setRole(e.target.value), disabled: !isAdmin, className: `${inputCls} disabled:bg-stone-100`, children: ROLES.map((r) => /* @__PURE__ */ jsx("option", { value: r, children: r }, r)) }) }),
-    /* @__PURE__ */ jsxs("p", { className: "text-xs text-stone-500 -mt-2 mb-4", children: [
-      roleHint[role],
-      !isAdmin && " S\xF3 o Administrador pode alterar o papel."
+      /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 -mt-2 mb-4", children: "Usados s\xF3 para a assinatura manuscrita dos documentos (Di\xE1ria, etc.) \u2014 n\xE3o afetam o login." }),
+      /* @__PURE__ */ jsxs(Field, { label: "Email", children: [
+        /* @__PURE__ */ jsx("input", { value: email, onChange: (e) => setEmail(e.target.value), type: "email", className: inputCls, placeholder: "nome@empresa.pt" }),
+        /* @__PURE__ */ jsx("span", { className: "block text-xs text-stone-400 mt-1", children: "Usado como contacto/identifica\xE7\xE3o." })
+      ] }),
+      /* @__PURE__ */ jsxs(Field, { label: "Assinatura", children: [
+        /* @__PURE__ */ jsxs("div", { onClick: () => fileInputRef.current?.click(), className: "border border-dashed border-stone-300 rounded-lg p-4 text-center cursor-pointer hover:bg-stone-50", children: [
+          assinatura ? /* @__PURE__ */ jsx("img", { src: assinatura, alt: "Assinatura", className: "max-h-16 mx-auto" }) : /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400", children: "Clique para carregar uma imagem da assinatura (PNG, at\xE9 500 KB)" }),
+          /* @__PURE__ */ jsx("input", { ref: fileInputRef, type: "file", accept: "image/*", onChange: handleAssinaturaFile, className: "hidden" })
+        ] }),
+        /* @__PURE__ */ jsxs("span", { className: "block text-xs text-stone-400 mt-1", children: [
+          "Sem assinatura carregada, os documentos usam o ",
+          primeiroNome || ultimoNome ? `nome (${`${primeiroNome} ${ultimoNome}`.trim()})` : "nome de login",
+          " num estilo manuscrito, a azul."
+        ] }),
+        assinatura && /* @__PURE__ */ jsx("button", { type: "button", onClick: () => setAssinatura(""), className: "text-xs text-red-600 hover:text-red-700 mt-1", children: "Remover assinatura" })
+      ] }),
+      /* @__PURE__ */ jsx(Field, { label: "Perfil", children: /* @__PURE__ */ jsx("select", { value: role, onChange: (e) => setRole(e.target.value), disabled: !isAdmin, className: `${inputCls} disabled:bg-stone-100`, children: ROLES.map((r) => /* @__PURE__ */ jsx("option", { value: r, children: r }, r)) }) }),
+      /* @__PURE__ */ jsxs("p", { className: "text-xs text-stone-500 -mt-2 mb-4", children: [
+        roleHint[role],
+        !isAdmin && " S\xF3 o Administrador pode alterar o papel."
+      ] })
     ] }),
     role === "Operador" && /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "Calend\xE1rio de Acesso aos Centros" }),
