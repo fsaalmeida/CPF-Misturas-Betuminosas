@@ -6657,7 +6657,7 @@ function DiariaModal({ data, artigos, clientes, centrosCusto, diarias, avarias, 
   const turno = dataInicio && dataFim ? dataFim === dataInicio ? "Diurno" : dataFim > dataInicio ? "Noturno" : "" : "";
   const dataFimInvalida = !!(dataInicio && dataFim && (dataFim < dataInicio || !isDataCalendarioValida(dataInicio) || !isDataCalendarioValida(dataFim)));
   const anoRef = dataInicio ? new Date(dataInicio).getFullYear() : (/* @__PURE__ */ new Date()).getFullYear();
-  const acumuladoAnual = (diarias || []).filter((d) => d.id !== data?.id && d.dataInicio && new Date(d.dataInicio).getFullYear() === anoRef).reduce((s, d) => s + (d.linhas || []).reduce((s2, l) => s2 + (parseFloat(l.toneladas) || 0), 0), 0) + totalToneladas;
+  const acumuladoAnual = (diarias || []).filter((d) => d.id !== data?.id && d.dataInicio && new Date(d.dataInicio).getFullYear() === anoRef && d.dataInicio <= dataInicio).reduce((s, d) => s + (d.linhas || []).reduce((s2, l) => s2 + (parseFloat(l.toneladas) || 0), 0), 0) + totalToneladas;
   const dataReferenciaPendentes = dataInicio || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   const diasAberto = (dIni) => Math.max(0, Math.round((new Date(dataReferenciaPendentes) - new Date(dIni)) / 864e5));
   const pendentes = [
