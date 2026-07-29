@@ -1605,7 +1605,7 @@ function App() {
             ]
           }
         ),
-        isAdmin && /* @__PURE__ */ jsxs(
+        canManageArticles && /* @__PURE__ */ jsxs(
           "button",
           {
             onClick: () => {
@@ -1630,7 +1630,7 @@ function App() {
             ]
           }
         ),
-        isAdmin && /* @__PURE__ */ jsxs(
+        canManageArticles && /* @__PURE__ */ jsxs(
           "button",
           {
             onClick: () => setView("fornecedores"),
@@ -1756,7 +1756,11 @@ function App() {
       view === "centers" && /* @__PURE__ */ jsx(
         CentersView,
         {
-          centers,
+          centers: currentUser.role === "Operador" ? centers.filter((c) => {
+            const hoje = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+            const escalasHoje = (currentUser.escalasCentros || []).filter((e) => e.dataInicio <= hoje && (!e.dataFim || e.dataFim >= hoje));
+            return escalasHoje.some((e) => e.centroId === c.id);
+          }) : centers,
           mixtures,
           diarias,
           podeEditar: podeEditarCentros,
@@ -1768,7 +1772,11 @@ function App() {
           onImport: importCenters
         }
       ),
-      view === "centerDetail" && selectedCenter && /* @__PURE__ */ jsx(
+      view === "centerDetail" && selectedCenter && (currentUser.role !== "Operador" || (() => {
+        const hoje = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+        const escalasHoje = (currentUser.escalasCentros || []).filter((e) => e.dataInicio <= hoje && (!e.dataFim || e.dataFim >= hoje));
+        return escalasHoje.some((e) => e.centroId === selectedCenter.id);
+      })()) && /* @__PURE__ */ jsx(
         CenterDetail,
         {
           center: selectedCenter,
@@ -1841,7 +1849,7 @@ function App() {
           onDeleteRececao: deleteRececao
         }
       ),
-      view === "clientes" && isAdmin && /* @__PURE__ */ jsx(
+      view === "clientes" && canManageArticles && /* @__PURE__ */ jsx(
         ClientesView,
         {
           clientes,
@@ -1856,7 +1864,7 @@ function App() {
           onBack: () => setView("centers")
         }
       ),
-      view === "fornecedores" && isAdmin && /* @__PURE__ */ jsx(
+      view === "fornecedores" && canManageArticles && /* @__PURE__ */ jsx(
         FornecedoresView,
         {
           fornecedores,
@@ -1942,7 +1950,7 @@ function App() {
         {
           cliente: clienteSocorpena,
           centrosCusto: centrosCustoSocorpena,
-          isAdmin,
+          isAdmin: canManageArticles,
           onAdd: () => setModal({ type: "centroCusto", data: { clienteId: clienteSocorpena.id } }),
           onEdit: (cc) => setModal({ type: "centroCusto", data: cc }),
           onDelete: deleteCentroCusto,
@@ -1953,7 +1961,7 @@ function App() {
           onBack: () => setView("centers")
         }
       ),
-      view === "clienteDetail" && selectedCliente && isAdmin && /* @__PURE__ */ jsx(
+      view === "clienteDetail" && selectedCliente && canManageArticles && /* @__PURE__ */ jsx(
         ClienteDetail,
         {
           cliente: selectedCliente,
