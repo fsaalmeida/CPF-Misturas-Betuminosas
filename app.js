@@ -12,6 +12,8 @@ const PERMISSOES_DEFEITO = {
   "Convidado": { centrosProducao: { visualizar: true, editar: false } }
 };
 const TIPOS_MATERIAL_DEFEITO = ["Agregado", "Betume", "Filler Comercial", "Aditivo", "Outro"];
+const TIPOS_DESCONTO_DEFEITO = ["ISP", "Desconto comercial", "B\xF3nus bom pagamento", "B\xF3nus quantidade"];
+const TIPOS_CUSTO_EXTRA_DEFEITO = ["Transporte", "Otimiza\xE7\xE3o"];
 const roleStyle = {
   "Administrador": { bg: "bg-amber-100", text: "text-amber-800", icon: ShieldCheck },
   "Gestor": { bg: "bg-sky-100", text: "text-sky-800", icon: Wrench },
@@ -56,6 +58,13 @@ const normUnidade = (u) => String(u || "").replace(/\s+/g, "").toLowerCase();
 const UNIDADES_CUSTO_MAO_OBRA = ["\u20AC/hora", "\u20AC/dia", "\u20AC/m\xEAs"];
 const UNIDADES_CONSUMO_COMBUSTIVEL = ["Lt/Ton", "Kg/Ton", "Ton/Ton", "m\xB3/Ton", "kWh/Ton"];
 const unidadeBaseCombustivel = (unidadeConsumo) => (unidadeConsumo || "Lt/Ton").split("/")[0];
+const custosExtraLista = (m) => {
+  if (Array.isArray(m?.custosExtra) && m.custosExtra.length > 0) return m.custosExtra;
+  const legado = [];
+  if (parseFloat(m?.custoTransporte) > 0) legado.push({ nome: "Transporte", valor: m.custoTransporte });
+  if (parseFloat(m?.custoOtimizacao) > 0) legado.push({ nome: "Otimiza\xE7\xE3o", valor: m.custoOtimizacao });
+  return legado;
+};
 const calcularPrecoFinal = (m) => {
   let preco = parseFloat(m.preco) || 0;
   (m.descontos || []).forEach((d) => {
@@ -63,7 +72,8 @@ const calcularPrecoFinal = (m) => {
     const valor = parseFloat(d.valor) || 0;
     preco = d.tipo === "fixo" ? Math.max(0, preco - valor) : Math.max(0, preco * (1 - valor / 100));
   });
-  return preco + (parseFloat(m.custoTransporte) || 0);
+  const extra = custosExtraLista(m).reduce((s, c) => s + (parseFloat(c.valor) || 0), 0);
+  return preco + extra;
 };
 const normalizarHistoricoPrecos = (material) => {
   if (Array.isArray(material?.historicoPrecos) && material.historicoPrecos.length > 0) return material.historicoPrecos;
@@ -404,6 +414,8 @@ function App() {
   const [centrosCusto, setCentrosCusto] = useState([]);
   const [permissoes, setPermissoes] = useState(PERMISSOES_DEFEITO);
   const [tiposMaterial, setTiposMaterial] = useState([]);
+  const [tiposDesconto, setTiposDesconto] = useState([]);
+  const [tiposCustoExtra, setTiposCustoExtra] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [activeCenterId, setActiveCenterId] = useState(null);
   const [view, setView] = useState("centers");
@@ -417,7 +429,7 @@ function App() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [u, c, m, p, cl, cc, d, f, av, mat, forn, cons, rec, equip, ajust, logo, dop, mo, perm, tipMat] = await Promise.allSettled([
+      const [u, c, m, p, cl, cc, d, f, av, mat, forn, cons, rec, equip, ajust, logo, dop, mo, perm, tipMat, tipDesc, tipCustoExtra] = await Promise.allSettled([
         window.storage.get("users", true),
         window.storage.get("centers", true),
         window.storage.get("mixtures", true),
@@ -437,7 +449,9 @@ function App() {
         window.storage.get("dopConfig", true),
         window.storage.get("maoDeObra", true),
         window.storage.get("permissoes", true),
-        window.storage.get("tiposMaterial", true)
+        window.storage.get("tiposMaterial", true),
+        window.storage.get("tiposDesconto", true),
+        window.storage.get("tiposCustoExtra", true)
       ]);
       setUsers(u.status === "fulfilled" && u.value ? JSON.parse(u.value.value) : []);
       setCenters(c.status === "fulfilled" && c.value ? JSON.parse(c.value.value) : []);
@@ -470,6 +484,24 @@ function App() {
         const tiposSemente = TIPOS_MATERIAL_DEFEITO.map((nome) => ({ id: genId(), nome }));
         setTiposMaterial(tiposSemente);
         window.storage.set("tiposMaterial", JSON.stringify(tiposSemente), true).catch(() => {
+        });
+      }
+      const descontosGuardados = tipDesc.status === "fulfilled" && tipDesc.value ? JSON.parse(tipDesc.value.value) : null;
+      if (descontosGuardados && descontosGuardados.length > 0) {
+        setTiposDesconto(descontosGuardados);
+      } else {
+        const descontosSemente = TIPOS_DESCONTO_DEFEITO.map((nome) => ({ id: genId(), nome }));
+        setTiposDesconto(descontosSemente);
+        window.storage.set("tiposDesconto", JSON.stringify(descontosSemente), true).catch(() => {
+        });
+      }
+      const custosExtraGuardados = tipCustoExtra.status === "fulfilled" && tipCustoExtra.value ? JSON.parse(tipCustoExtra.value.value) : null;
+      if (custosExtraGuardados && custosExtraGuardados.length > 0) {
+        setTiposCustoExtra(custosExtraGuardados);
+      } else {
+        const custosExtraSemente = TIPOS_CUSTO_EXTRA_DEFEITO.map((nome) => ({ id: genId(), nome }));
+        setTiposCustoExtra(custosExtraSemente);
+        window.storage.set("tiposCustoExtra", JSON.stringify(custosExtraSemente), true).catch(() => {
         });
       }
     } catch (e) {
@@ -658,6 +690,42 @@ function App() {
         setConfirmDialog(null);
       }
     );
+  };
+  const saveTipoDesconto = (data) => {
+    setTiposDesconto((prev) => {
+      const atualizado = data.id ? prev.map((t) => t.id === data.id ? { ...t, ...data } : t) : [...prev, { ...data, id: genId() }];
+      persistRaw("tiposDesconto", atualizado);
+      return atualizado;
+    });
+  };
+  const deleteTipoDesconto = (id) => {
+    const target = tiposDesconto.find((t) => t.id === id);
+    askConfirm(`Eliminar o tipo de desconto "${target?.nome}"? Descontos j\xE1 registados com este nome mant\xEAm o texto, s\xF3 deixa de aparecer nas novas escolhas.`, () => {
+      setTiposDesconto((prev) => {
+        const atualizado = prev.filter((t) => t.id !== id);
+        persistRaw("tiposDesconto", atualizado);
+        return atualizado;
+      });
+      setConfirmDialog(null);
+    });
+  };
+  const saveTipoCustoExtra = (data) => {
+    setTiposCustoExtra((prev) => {
+      const atualizado = data.id ? prev.map((t) => t.id === data.id ? { ...t, ...data } : t) : [...prev, { ...data, id: genId() }];
+      persistRaw("tiposCustoExtra", atualizado);
+      return atualizado;
+    });
+  };
+  const deleteTipoCustoExtra = (id) => {
+    const target = tiposCustoExtra.find((t) => t.id === id);
+    askConfirm(`Eliminar o tipo de custo extra "${target?.nome}"? Custos j\xE1 registados com este nome mant\xEAm o texto, s\xF3 deixa de aparecer nas novas escolhas.`, () => {
+      setTiposCustoExtra((prev) => {
+        const atualizado = prev.filter((t) => t.id !== id);
+        persistRaw("tiposCustoExtra", atualizado);
+        return atualizado;
+      });
+      setConfirmDialog(null);
+    });
   };
   const saveCenter = (data) => {
     if (data.id) {
@@ -1068,7 +1136,7 @@ function App() {
         fornecedor: data.fornecedor,
         centrosIds: data.centrosIds,
         tipoMaterialId: data.tipoMaterialId,
-        historicoPrecos: [{ id: genId(), preco: data.preco, descontos: data.descontos, custoTransporte: data.custoTransporte, dataEntradaVigor: data.dataEntradaVigor }]
+        historicoPrecos: [{ id: genId(), preco: data.preco, descontos: data.descontos, custosExtra: data.custosExtra, dataEntradaVigor: data.dataEntradaVigor }]
       };
       persist("materiais", [...materiais, novoMaterial], setMateriais);
     }
@@ -1118,7 +1186,7 @@ function App() {
         id: genId(),
         preco: r.preco,
         descontos: (r.descontos || []).map((d) => ({ id: genId(), ...d })),
-        custoTransporte: r.custoTransporte || 0,
+        custosExtra: r.custosExtra || [],
         dataEntradaVigor: r.dataEntradaVigor
       });
     });
@@ -1150,7 +1218,7 @@ function App() {
         fornecedor: data.fornecedor,
         centrosIds: data.centrosIds,
         unidadeCusto: data.unidadeCusto,
-        historicoPrecos: [{ id: genId(), preco: data.preco, descontos: data.descontos, custoTransporte: data.custoTransporte, dataEntradaVigor: data.dataEntradaVigor }]
+        historicoPrecos: [{ id: genId(), preco: data.preco, descontos: data.descontos, custosExtra: data.custosExtra, dataEntradaVigor: data.dataEntradaVigor }]
       };
       persist("consumiveis", [...consumiveis, novoConsumivel], setConsumiveis);
     }
@@ -1198,7 +1266,7 @@ function App() {
         id: genId(),
         preco: r.preco,
         descontos: (r.descontos || []).map((d) => ({ id: genId(), ...d })),
-        custoTransporte: r.custoTransporte || 0,
+        custosExtra: r.custosExtra || [],
         dataEntradaVigor: r.dataEntradaVigor
       });
     });
@@ -1881,6 +1949,8 @@ function App() {
           materiais,
           centers,
           tiposMaterial,
+          tiposDesconto,
+          tiposCustoExtra,
           onAdd: () => setModal({ type: "material" }),
           onEdit: (m) => setModal({ type: "material", data: m }),
           onDelete: deleteMaterial,
@@ -1891,7 +1961,11 @@ function App() {
           onDuplicate: duplicarMaterial,
           onBack: () => setView("centers"),
           onSaveTipoMaterial: saveTipoMaterial,
-          onDeleteTipoMaterial: deleteTipoMaterial
+          onDeleteTipoMaterial: deleteTipoMaterial,
+          onSaveTipoDesconto: saveTipoDesconto,
+          onDeleteTipoDesconto: deleteTipoDesconto,
+          onSaveTipoCustoExtra: saveTipoCustoExtra,
+          onDeleteTipoCustoExtra: deleteTipoCustoExtra
         }
       ),
       view === "consumiveis" && isAdmin && /* @__PURE__ */ jsx(
@@ -1900,6 +1974,8 @@ function App() {
           tipo: "consumivel",
           materiais: consumiveis,
           centers,
+          tiposDesconto,
+          tiposCustoExtra,
           onAdd: () => setModal({ type: "consumivel" }),
           onEdit: (m) => setModal({ type: "consumivel", data: m }),
           onDelete: deleteConsumivel,
@@ -1908,7 +1984,11 @@ function App() {
           onUpdatePricePicker: () => setModal({ type: "escolherConsumivel" }),
           onImportPrecos: () => setModal({ type: "importConsumiveis" }),
           onDuplicate: duplicarConsumivel,
-          onBack: () => setView("centers")
+          onBack: () => setView("centers"),
+          onSaveTipoDesconto: saveTipoDesconto,
+          onDeleteTipoDesconto: deleteTipoDesconto,
+          onSaveTipoCustoExtra: saveTipoCustoExtra,
+          onDeleteTipoCustoExtra: deleteTipoCustoExtra
         }
       ),
       view === "equipamentos" && isAdmin && /* @__PURE__ */ jsx(
@@ -2144,28 +2224,28 @@ function App() {
       }
     ),
     modal?.type === "cliente" && /* @__PURE__ */ jsx(ClienteModal, { data: modal.data, onSave: saveCliente, onClose: () => setModal(null) }),
-    modal?.type === "material" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tiposMaterial, onSave: saveMaterial, onClose: () => setModal(null) }),
-    modal?.type === "precoMaterial" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, onSave: addPrecoMaterial, onClose: () => setModal(null) }),
+    modal?.type === "material" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tiposDesconto, tiposCustoExtra, tiposMaterial, onSave: saveMaterial, onClose: () => setModal(null) }),
+    modal?.type === "precoMaterial" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, tiposDesconto, tiposCustoExtra, onSave: addPrecoMaterial, onClose: () => setModal(null) }),
     modal?.type === "historicoMaterial" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, onDelete: deletePrecoMaterial, onEdit: (material, entry) => setModal({ type: "editarPreco", data: { material, entry } }), onClose: () => setModal(null) }),
-    modal?.type === "editarPreco" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, onSave: editarPrecoMaterial, onClose: () => setModal({ type: "historicoMaterial", data: modal.data.material }) }),
+    modal?.type === "editarPreco" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, tiposDesconto, tiposCustoExtra, onSave: editarPrecoMaterial, onClose: () => setModal({ type: "historicoMaterial", data: modal.data.material }) }),
     modal?.type === "escolherMaterial" && /* @__PURE__ */ jsx(EscolherMaterialModal, { materiais, onChoose: (m) => setModal({ type: "precoMaterial", data: m }), onClose: () => setModal(null) }),
     modal?.type === "importMateriais" && /* @__PURE__ */ jsx(ImportMateriaisModal, { materiaisExistentes: materiais, onImport: importMateriaisPrecos, onClose: () => setModal(null) }),
-    modal?.type === "consumivel" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tipo: "consumivel", onSave: saveConsumivel, onClose: () => setModal(null) }),
-    modal?.type === "precoConsumivel" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, tipo: "consumivel", onSave: addPrecoConsumivel, onClose: () => setModal(null) }),
+    modal?.type === "consumivel" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tiposDesconto, tiposCustoExtra, tipo: "consumivel", onSave: saveConsumivel, onClose: () => setModal(null) }),
+    modal?.type === "precoConsumivel" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, tiposDesconto, tiposCustoExtra, tipo: "consumivel", onSave: addPrecoConsumivel, onClose: () => setModal(null) }),
     modal?.type === "historicoConsumivel" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, onDelete: deletePrecoConsumivel, onEdit: (material, entry) => setModal({ type: "editarPrecoConsumivel", data: { material, entry } }), onClose: () => setModal(null) }),
-    modal?.type === "editarPrecoConsumivel" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, tipo: "consumivel", onSave: editarPrecoConsumivel, onClose: () => setModal({ type: "historicoConsumivel", data: modal.data.material }) }),
+    modal?.type === "editarPrecoConsumivel" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, tiposDesconto, tiposCustoExtra, tipo: "consumivel", onSave: editarPrecoConsumivel, onClose: () => setModal({ type: "historicoConsumivel", data: modal.data.material }) }),
     modal?.type === "escolherConsumivel" && /* @__PURE__ */ jsx(EscolherMaterialModal, { materiais: consumiveis, tipo: "consumivel", onChoose: (c) => setModal({ type: "precoConsumivel", data: c }), onClose: () => setModal(null) }),
     modal?.type === "importConsumiveis" && /* @__PURE__ */ jsx(ImportMateriaisModal, { materiaisExistentes: consumiveis, tipo: "consumivel", onImport: importConsumiveisPrecos, onClose: () => setModal(null) }),
-    modal?.type === "equipamento" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tipo: "equipamento", onSave: saveEquipamento, onClose: () => setModal(null) }),
-    modal?.type === "precoEquipamento" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, tipo: "equipamento", onSave: addPrecoEquipamento, onClose: () => setModal(null) }),
+    modal?.type === "equipamento" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tiposDesconto, tiposCustoExtra, tipo: "equipamento", onSave: saveEquipamento, onClose: () => setModal(null) }),
+    modal?.type === "precoEquipamento" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, tiposDesconto, tiposCustoExtra, tipo: "equipamento", onSave: addPrecoEquipamento, onClose: () => setModal(null) }),
     modal?.type === "historicoEquipamento" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, onDelete: deletePrecoEquipamento, onEdit: (material, entry) => setModal({ type: "editarPrecoEquipamento", data: { material, entry } }), onClose: () => setModal(null) }),
-    modal?.type === "editarPrecoEquipamento" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, tipo: "equipamento", onSave: editarPrecoEquipamento, onClose: () => setModal({ type: "historicoEquipamento", data: modal.data.material }) }),
+    modal?.type === "editarPrecoEquipamento" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, tiposDesconto, tiposCustoExtra, tipo: "equipamento", onSave: editarPrecoEquipamento, onClose: () => setModal({ type: "historicoEquipamento", data: modal.data.material }) }),
     modal?.type === "escolherEquipamento" && /* @__PURE__ */ jsx(EscolherMaterialModal, { materiais: equipamentos, tipo: "equipamento", onChoose: (eq) => setModal({ type: "precoEquipamento", data: eq }), onClose: () => setModal(null) }),
     modal?.type === "importEquipamentos" && /* @__PURE__ */ jsx(ImportMateriaisModal, { materiaisExistentes: equipamentos, tipo: "equipamento", onImport: importEquipamentosPrecos, onClose: () => setModal(null) }),
-    modal?.type === "maodeobra" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tipo: "maodeobra", onSave: saveMaoDeObra, onClose: () => setModal(null) }),
-    modal?.type === "precoMaoObra" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, tipo: "maodeobra", onSave: addPrecoMaoObra, onClose: () => setModal(null) }),
+    modal?.type === "maodeobra" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tiposDesconto, tiposCustoExtra, tipo: "maodeobra", onSave: saveMaoDeObra, onClose: () => setModal(null) }),
+    modal?.type === "precoMaoObra" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, tiposDesconto, tiposCustoExtra, tipo: "maodeobra", onSave: addPrecoMaoObra, onClose: () => setModal(null) }),
     modal?.type === "historicoMaoObra" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, onDelete: deletePrecoMaoObra, onEdit: (material, entry) => setModal({ type: "editarPrecoMaoObra", data: { material, entry } }), onClose: () => setModal(null) }),
-    modal?.type === "editarPrecoMaoObra" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, tipo: "maodeobra", onSave: editarPrecoMaoObra, onClose: () => setModal({ type: "historicoMaoObra", data: modal.data.material }) }),
+    modal?.type === "editarPrecoMaoObra" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, tiposDesconto, tiposCustoExtra, tipo: "maodeobra", onSave: editarPrecoMaoObra, onClose: () => setModal({ type: "historicoMaoObra", data: modal.data.material }) }),
     modal?.type === "escolherMaoObra" && /* @__PURE__ */ jsx(EscolherMaterialModal, { materiais: maoDeObra, tipo: "maodeobra", onChoose: (mo) => setModal({ type: "precoMaoObra", data: mo }), onClose: () => setModal(null) }),
     modal?.type === "importMaoObra" && /* @__PURE__ */ jsx(ImportMateriaisModal, { materiaisExistentes: maoDeObra, tipo: "maodeobra", onImport: importMaoDeObraPrecos, onClose: () => setModal(null) }),
     modal?.type === "importClientes" && /* @__PURE__ */ jsx(ImportClientesModal, { onImport: importClientes, onClose: () => setModal(null) }),
@@ -2668,9 +2748,11 @@ function FornecedoresView({ fornecedores, onAdd, onEdit, onImport, onDelete, onB
     ] }, f.id)) })
   ] });
 }
-function MateriaisView({ tipo, materiais, centers, tiposMaterial, onAdd, onEdit, onDelete, onAddPreco, onViewHistorico, onUpdatePricePicker, onImportPrecos, onDuplicate, onBack, onSaveTipoMaterial, onDeleteTipoMaterial }) {
+function MateriaisView({ tipo, materiais, centers, tiposMaterial, tiposDesconto, tiposCustoExtra, onAdd, onEdit, onDelete, onAddPreco, onViewHistorico, onUpdatePricePicker, onImportPrecos, onDuplicate, onBack, onSaveTipoMaterial, onDeleteTipoMaterial, onSaveTipoDesconto, onDeleteTipoDesconto, onSaveTipoCustoExtra, onDeleteTipoCustoExtra }) {
   const [query, setQuery] = useState("");
   const [mostrarTipos, setMostrarTipos] = useState(false);
+  const [mostrarDescontos, setMostrarDescontos] = useState(false);
+  const [mostrarCustosExtra, setMostrarCustosExtra] = useState(false);
   const isConsumivel = tipo === "consumivel";
   const isEquipamento = tipo === "equipamento";
   const isMaoDeObra = tipo === "maodeobra";
@@ -2690,6 +2772,7 @@ function MateriaisView({ tipo, materiais, centers, tiposMaterial, onAdd, onEdit,
     return `${ids.length} centros`;
   };
   const descontoTexto = (d) => `${d.tipo === "fixo" ? `${parseFloat(d.valor || 0).toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : `${d.valor || 0}%`} (${d.categoria === "Outro" && d.outroTexto ? d.outroTexto : d.categoria})${d.aplicarNoCalculo === false ? " [n\xE3o entra no c\xE1lculo]" : ""}`;
+  const custosExtraTexto = (h) => custosExtraLista(h).map((c) => `${c.nome}: ${parseFloat(c.valor || 0).toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC`).join(" | ");
   const exportar = () => {
     const linhas = [];
     filtrados.forEach((m) => {
@@ -2706,7 +2789,7 @@ function MateriaisView({ tipo, materiais, centers, tiposMaterial, onAdd, onEdit,
           m.fornecedor || "",
           h.dataEntradaVigor || "",
           h.preco ?? "",
-          h.custoTransporte ?? "",
+          custosExtraTexto(h),
           descontosTxt,
           h.id === vigente?.id ? "Sim" : "",
           m.unidadeCusto || "",
@@ -2717,7 +2800,7 @@ function MateriaisView({ tipo, materiais, centers, tiposMaterial, onAdd, onEdit,
     exportarListaExcel(
       `${normalizeHeader(nomePlural).replace(/[^a-z0-9]+/g, "_")}_com_historico.xlsx`,
       nomePlural,
-      ["Designa\xE7\xE3o", "Fornecedor", "Data Entrada em Vigor", "Pre\xE7o", "Custo Transporte", "Descontos", "Pre\xE7o Atual?", "Unidade", "Aplica-se a"],
+      ["Designa\xE7\xE3o", "Fornecedor", "Data Entrada em Vigor", "Pre\xE7o", "Custos Extra", "Descontos", "Pre\xE7o Atual?", "Unidade", "Aplica-se a"],
       linhas
     );
   };
@@ -2735,6 +2818,16 @@ function MateriaisView({ tipo, materiais, centers, tiposMaterial, onAdd, onEdit,
         isMaterial && /* @__PURE__ */ jsxs("button", { onClick: () => setMostrarTipos(true), className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
           /* @__PURE__ */ jsx(Settings, { size: 15 }),
           " Gerir Tipos"
+        ] }),
+        (isMaterial || isConsumivel) && /* @__PURE__ */ jsxs(Fragment, { children: [
+          /* @__PURE__ */ jsxs("button", { onClick: () => setMostrarDescontos(true), className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
+            /* @__PURE__ */ jsx(Settings, { size: 15 }),
+            " Gerir Descontos"
+          ] }),
+          /* @__PURE__ */ jsxs("button", { onClick: () => setMostrarCustosExtra(true), className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
+            /* @__PURE__ */ jsx(Settings, { size: 15 }),
+            " Gerir Custos Extra"
+          ] })
         ] }),
         /* @__PURE__ */ jsxs("button", { onClick: exportar, className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
           /* @__PURE__ */ jsx(FileSpreadsheet, { size: 15 }),
@@ -2756,6 +2849,32 @@ function MateriaisView({ tipo, materiais, centers, tiposMaterial, onAdd, onEdit,
       ] })
     ] }),
     mostrarTipos && /* @__PURE__ */ jsx(TiposMaterialModal, { tiposMaterial, materiais, onSave: onSaveTipoMaterial, onDelete: onDeleteTipoMaterial, onClose: () => setMostrarTipos(false) }),
+    mostrarDescontos && /* @__PURE__ */ jsx(
+      GerirTiposModal,
+      {
+        titulo: "Gerir Descontos",
+        subtitulo: nomePlural,
+        descricao: "Tipos de desconto dispon\xEDveis ao registar o pre\xE7o \u2014 ex: Desconto comercial, B\xF3nus bom pagamento.",
+        tipos: tiposDesconto,
+        placeholderNovo: "Novo tipo de desconto (ex: B\xF3nus fideliza\xE7\xE3o)",
+        onSave: onSaveTipoDesconto,
+        onDelete: onDeleteTipoDesconto,
+        onClose: () => setMostrarDescontos(false)
+      }
+    ),
+    mostrarCustosExtra && /* @__PURE__ */ jsx(
+      GerirTiposModal,
+      {
+        titulo: "Gerir Custos Extra",
+        subtitulo: nomePlural,
+        descricao: "Tipos de custo extra que se somam ao pre\xE7o \u2014 ex: Transporte, Otimiza\xE7\xE3o.",
+        tipos: tiposCustoExtra,
+        placeholderNovo: "Novo custo extra (ex: Seguro)",
+        onSave: onSaveTipoCustoExtra,
+        onDelete: onDeleteTipoCustoExtra,
+        onClose: () => setMostrarCustosExtra(false)
+      }
+    ),
     /* @__PURE__ */ jsxs("div", { className: "relative mb-4", children: [
       /* @__PURE__ */ jsx(Search, { className: "absolute left-3 top-1/2 -translate-y-1/2 text-stone-400", size: 16 }),
       /* @__PURE__ */ jsx(
@@ -2803,13 +2922,13 @@ function MateriaisView({ tipo, materiais, centers, tiposMaterial, onAdd, onEdit,
               " \u20AC",
               isConsumivel ? `/${unidadeBaseCombustivel(m.unidadeCusto)}` : ""
             ] }),
-            (vigente.descontos && vigente.descontos.length > 0 || parseFloat(vigente.custoTransporte) > 0) && /* @__PURE__ */ jsxs("span", { className: "text-stone-400", children: [
+            (vigente.descontos && vigente.descontos.length > 0 || custosExtraLista(vigente).length > 0) && /* @__PURE__ */ jsxs("span", { className: "text-stone-400", children: [
               " ",
               "(base ",
               parseFloat(vigente.preco || 0).toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
               " \u20AC",
               (vigente.descontos || []).map((d) => ` \u2212 ${descontoTexto(d)}`).join(""),
-              parseFloat(vigente.custoTransporte) > 0 ? ` + transporte ${parseFloat(vigente.custoTransporte).toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "",
+              custosExtraLista(vigente).map((c) => ` + ${c.nome.toLowerCase()} ${parseFloat(c.valor || 0).toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC`).join(""),
               ")"
             ] }),
             vigente.dataEntradaVigor && /* @__PURE__ */ jsxs(Fragment, { children: [
@@ -8612,6 +8731,40 @@ function EditarIncidenciaDiariaModal({ item, onSave, onClose }) {
     /* @__PURE__ */ jsx("button", { onClick: submit, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700", children: "Guardar altera\xE7\xF5es" })
   ] });
 }
+function CustosExtraEditor({ custosExtra, onChange, tipos }) {
+  const nomesDisponiveis = (tipos || []).map((t) => t.nome);
+  const addCusto = () => {
+    onChange([...custosExtra, { id: genId(), nome: nomesDisponiveis[0] || "", valor: "" }]);
+  };
+  const updateCusto = (id, field, value) => onChange(custosExtra.map((c) => c.id === id ? { ...c, [field]: value } : c));
+  const removeCusto = (id) => onChange(custosExtra.filter((c) => c.id !== id));
+  return /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "Custos Extra" }),
+    /* @__PURE__ */ jsx("div", { className: "space-y-2 mb-2", children: custosExtra.map((c) => /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+      /* @__PURE__ */ jsxs("select", { value: c.nome, onChange: (e) => updateCusto(c.id, "nome", e.target.value), className: `${inputCls} flex-1`, children: [
+        nomesDisponiveis.length === 0 && /* @__PURE__ */ jsx("option", { value: "", children: "\u2014 Nenhum tipo definido \u2014" }),
+        nomesDisponiveis.map((n) => /* @__PURE__ */ jsx("option", { value: n, children: n }, n))
+      ] }),
+      /* @__PURE__ */ jsx(
+        "input",
+        {
+          value: c.valor,
+          onChange: (e) => updateCusto(c.id, "valor", e.target.value),
+          type: "number",
+          step: "0.01",
+          min: "0",
+          className: `${inputCls} font-mono-data w-28`,
+          placeholder: "0.00"
+        }
+      ),
+      /* @__PURE__ */ jsx("button", { type: "button", onClick: () => removeCusto(c.id), className: "text-stone-400 hover:text-red-600 shrink-0", children: /* @__PURE__ */ jsx(X, { size: 16 }) })
+    ] }, c.id)) }),
+    /* @__PURE__ */ jsxs("button", { type: "button", onClick: addCusto, className: "w-full mb-4 py-2 rounded-lg border border-dashed border-stone-300 text-stone-500 text-sm font-semibold hover:bg-stone-50 flex items-center justify-center gap-1.5", children: [
+      /* @__PURE__ */ jsx(Plus, { size: 15 }),
+      " Adicionar custo extra"
+    ] })
+  ] });
+}
 function DescontosEditor({ descontos, onChange, categorias }) {
   const listaCategorias = categorias || DESCONTO_CATEGORIAS;
   const addDesconto = () => {
@@ -8693,6 +8846,72 @@ function validarDescontos(descontos, setError) {
   }
   return true;
 }
+function GerirTiposModal({ titulo, subtitulo, descricao, tipos, placeholderNovo, onSave, onDelete, onClose }) {
+  const [novoNome, setNovoNome] = useState("");
+  const [editandoId, setEditandoId] = useState(null);
+  const [editandoNome, setEditandoNome] = useState("");
+  const [error, setError] = useState("");
+  const adicionar = () => {
+    if (!novoNome.trim()) return setError("Indique o nome");
+    if (tipos.some((t) => t.nome.trim().toLowerCase() === novoNome.trim().toLowerCase())) {
+      return setError("J\xE1 existe um com esse nome");
+    }
+    onSave({ nome: novoNome.trim() });
+    setNovoNome("");
+    setError("");
+  };
+  const iniciarEdicao = (t) => {
+    setEditandoId(t.id);
+    setEditandoNome(t.nome);
+    setError("");
+  };
+  const guardarEdicao = () => {
+    if (!editandoNome.trim()) return setError("Indique o nome");
+    if (tipos.some((t) => t.id !== editandoId && t.nome.trim().toLowerCase() === editandoNome.trim().toLowerCase())) {
+      return setError("J\xE1 existe um com esse nome");
+    }
+    onSave({ id: editandoId, nome: editandoNome.trim() });
+    setEditandoId(null);
+    setError("");
+  };
+  return /* @__PURE__ */ jsxs(Modal, { title: titulo, subtitle: subtitulo, onClose, children: [
+    descricao && /* @__PURE__ */ jsx("p", { className: "text-sm text-stone-500 mb-4", children: descricao }),
+    /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-hidden mb-4", children: tipos.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-sm text-stone-400 px-3 py-4 text-center", children: "Ainda n\xE3o h\xE1 nenhum definido." }) : tipos.map((t, i) => /* @__PURE__ */ jsx("div", { className: `flex items-center justify-between px-3 py-2.5 ${i !== tipos.length - 1 ? "border-b border-stone-100" : ""}`, children: editandoId === t.id ? /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 flex-1", children: [
+      /* @__PURE__ */ jsx(
+        "input",
+        {
+          value: editandoNome,
+          onChange: (e) => setEditandoNome(e.target.value),
+          className: `${inputCls} flex-1`,
+          autoFocus: true,
+          onKeyDown: (e) => e.key === "Enter" && guardarEdicao()
+        }
+      ),
+      /* @__PURE__ */ jsx("button", { onClick: guardarEdicao, className: "text-xs font-semibold text-amber-700 hover:text-amber-800 shrink-0", children: "Guardar" }),
+      /* @__PURE__ */ jsx("button", { onClick: () => setEditandoId(null), className: "text-xs text-stone-400 hover:text-stone-600 shrink-0", children: "Cancelar" })
+    ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx("span", { className: "text-sm text-stone-700", children: t.nome }),
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1 shrink-0", children: [
+        /* @__PURE__ */ jsx("span", { onClick: () => iniciarEdicao(t), className: "p-1.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg cursor-pointer", children: /* @__PURE__ */ jsx(Pencil, { size: 14 }) }),
+        /* @__PURE__ */ jsx("span", { onClick: () => onDelete(t.id), className: "p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg cursor-pointer", children: /* @__PURE__ */ jsx(Trash2, { size: 14 }) })
+      ] })
+    ] }) }, t.id)) }),
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+      /* @__PURE__ */ jsx(
+        "input",
+        {
+          value: novoNome,
+          onChange: (e) => setNovoNome(e.target.value),
+          placeholder: placeholderNovo,
+          className: `${inputCls} flex-1`,
+          onKeyDown: (e) => e.key === "Enter" && adicionar()
+        }
+      ),
+      /* @__PURE__ */ jsx("button", { onClick: adicionar, className: "px-4 py-2.5 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 shrink-0", children: "Adicionar" })
+    ] }),
+    error && /* @__PURE__ */ jsx("p", { className: "text-red-600 text-sm mt-3", children: error })
+  ] });
+}
 function TiposMaterialModal({ tiposMaterial, materiais, onSave, onDelete, onClose }) {
   const [novoNome, setNovoNome] = useState("");
   const [editandoId, setEditandoId] = useState(null);
@@ -8767,7 +8986,7 @@ function TiposMaterialModal({ tiposMaterial, materiais, onSave, onDelete, onClos
     error && /* @__PURE__ */ jsx("p", { className: "text-red-600 text-sm mt-3", children: error })
   ] });
 }
-function MaterialModal({ data, centers, fornecedores, tipo, tiposMaterial, onSave, onClose }) {
+function MaterialModal({ data, centers, fornecedores, tipo, tiposMaterial, tiposDesconto, tiposCustoExtra, onSave, onClose }) {
   const isNew = !data?.id;
   const isConsumivel = tipo === "consumivel";
   const isEquipamento = tipo === "equipamento";
@@ -8784,10 +9003,10 @@ function MaterialModal({ data, centers, fornecedores, tipo, tiposMaterial, onSav
   const [unidadeCusto, setUnidadeCusto] = useState(data?.unidadeCusto || (isMaoDeObra ? UNIDADES_CUSTO_MAO_OBRA[0] : UNIDADES_CUSTO_EQUIPAMENTO[0]));
   const [unidadeConsumo, setUnidadeConsumo] = useState(data?.unidadeCusto || UNIDADES_CONSUMO_COMBUSTIVEL[0]);
   const [descontos, setDescontos] = useState([]);
-  const [custoTransporte, setCustoTransporte] = useState("");
+  const [custosExtra, setCustosExtra] = useState([]);
   const [dataEntradaVigor, setDataEntradaVigor] = useState((/* @__PURE__ */ new Date()).toISOString().slice(0, 10));
   const [error, setError] = useState("");
-  const precoFinal = calcularPrecoFinal({ preco, descontos, custoTransporte });
+  const precoFinal = calcularPrecoFinal({ preco, descontos, custosExtra });
   const submit = () => {
     if (!designacao.trim()) return setError("Indique a designa\xE7\xE3o");
     if (aplicacao !== "todos" && aplicacao.length === 0) return setError('Escolha pelo menos um centro, ou "Todos os centros"');
@@ -8807,7 +9026,7 @@ function MaterialModal({ data, centers, fornecedores, tipo, tiposMaterial, onSav
       ...isNew ? {
         preco: parseFloat(preco),
         descontos: isUnidadeSimples ? [] : descontos.map((d) => ({ ...d, valor: parseFloat(d.valor) })),
-        custoTransporte: isUnidadeSimples ? 0 : custoTransporte === "" ? 0 : parseFloat(custoTransporte),
+        custosExtra: isUnidadeSimples ? [] : custosExtra.map((c) => ({ ...c, valor: parseFloat(c.valor) || 0 })),
         dataEntradaVigor
       } : {}
     });
@@ -8827,15 +9046,13 @@ function MaterialModal({ data, centers, fornecedores, tipo, tiposMaterial, onSav
     ] }),
     isNew ? /* @__PURE__ */ jsxs(Fragment, { children: [
       isUnidadeSimples ? /* @__PURE__ */ jsx(Field, { label: "Pre\xE7o inicial (\u20AC)", children: /* @__PURE__ */ jsx("input", { value: preco, onChange: (e) => setPreco(e.target.value), type: "number", step: "0.01", min: "0", className: `${inputCls} font-mono-data`, placeholder: "0.00" }) }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-        /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
-          /* @__PURE__ */ jsx(Field, { label: isConsumivel ? `Pre\xE7o inicial (\u20AC/${unidadeBaseCombustivel(unidadeConsumo)})` : "Pre\xE7o inicial (\u20AC)", children: /* @__PURE__ */ jsx("input", { value: preco, onChange: (e) => setPreco(e.target.value), type: "number", step: "0.01", min: "0", className: `${inputCls} font-mono-data`, placeholder: "0.00" }) }),
-          /* @__PURE__ */ jsx(Field, { label: "Custo de Transporte (\u20AC)", children: /* @__PURE__ */ jsx("input", { value: custoTransporte, onChange: (e) => setCustoTransporte(e.target.value), type: "number", step: "0.01", min: "0", className: `${inputCls} font-mono-data`, placeholder: "0.00" }) })
-        ] }),
-        /* @__PURE__ */ jsx(DescontosEditor, { descontos, onChange: setDescontos, categorias: isConsumivel ? DESCONTO_CATEGORIAS_CONSUMIVEL : DESCONTO_CATEGORIAS })
+        /* @__PURE__ */ jsx(Field, { label: isConsumivel ? `Pre\xE7o inicial (\u20AC/${unidadeBaseCombustivel(unidadeConsumo)})` : "Pre\xE7o inicial (\u20AC)", children: /* @__PURE__ */ jsx("input", { value: preco, onChange: (e) => setPreco(e.target.value), type: "number", step: "0.01", min: "0", className: `${inputCls} font-mono-data`, placeholder: "0.00" }) }),
+        /* @__PURE__ */ jsx(CustosExtraEditor, { custosExtra, onChange: setCustosExtra, tipos: tiposCustoExtra }),
+        /* @__PURE__ */ jsx(DescontosEditor, { descontos, onChange: setDescontos, categorias: [...(tiposDesconto || []).map((t) => t.nome), "Outro"] })
       ] }),
       /* @__PURE__ */ jsx(Field, { label: "Data de Entrada em Vigor", children: /* @__PURE__ */ jsx("input", { type: "date", value: dataEntradaVigor, onChange: (e) => setDataEntradaVigor(e.target.value), className: inputCls }) }),
       !isUnidadeSimples && /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-amber-50 rounded-lg px-4 py-2.5 mb-4", children: [
-        /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-amber-800", children: "Pre\xE7o final (com descontos e transporte)" }),
+        /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-amber-800", children: "Pre\xE7o final (com descontos, transporte e otimiza\xE7\xE3o)" }),
         /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-amber-800", children: [
           precoFinal.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
           " \u20AC"
@@ -8896,21 +9113,22 @@ function EscolherMaterialModal({ materiais, tipo, onChoose, onClose }) {
     }) })
   ] });
 }
-function AtualizarPrecoModal({ material, tipo, onSave, onClose }) {
+function AtualizarPrecoModal({ material, tipo, tiposDesconto, tiposCustoExtra, onSave, onClose }) {
   const isEquipamento = tipo === "equipamento" || tipo === "maodeobra";
   const isConsumivel = tipo === "consumivel";
   const rotuloPreco = isConsumivel ? `Pre\xE7o (\u20AC/${unidadeBaseCombustivel(material.unidadeCusto)})` : "Pre\xE7o (\u20AC)";
   const atual = precoVigente(material);
+  const custosExtraIniciais = () => custosExtraLista(atual).map((c) => ({ ...c, id: genId(), valor: String(c.valor) }));
   const [preco, setPreco] = useState(atual ? String(atual.preco ?? "") : "");
   const [descontos, setDescontos] = useState(atual?.descontos ? atual.descontos.map((d) => ({ ...d, id: genId() })) : []);
-  const [custoTransporte, setCustoTransporte] = useState(atual ? String(atual.custoTransporte ?? 0) : "");
+  const [custosExtra, setCustosExtra] = useState(custosExtraIniciais());
   const [dataEntradaVigor, setDataEntradaVigor] = useState((/* @__PURE__ */ new Date()).toISOString().slice(0, 10));
   const [error, setError] = useState("");
   const precoOriginal = atual ? String(atual.preco ?? "") : "";
-  const transporteOriginal = atual ? String(atual.custoTransporte ?? 0) : "";
   const normalizarDescontos = (arr) => JSON.stringify((arr || []).map((d) => ({ tipo: d.tipo, valor: parseFloat(d.valor || 0), categoria: d.categoria, outroTexto: d.outroTexto || "" })));
-  const semAlteracao = !!atual && preco === precoOriginal && (isEquipamento || custoTransporte === transporteOriginal) && (isEquipamento || normalizarDescontos(descontos) === normalizarDescontos(atual.descontos));
-  const precoFinal = calcularPrecoFinal({ preco, descontos, custoTransporte });
+  const normalizarCustosExtra = (arr) => JSON.stringify((arr || []).map((c) => ({ nome: c.nome, valor: parseFloat(c.valor || 0) })).sort((a, b) => a.nome.localeCompare(b.nome)));
+  const semAlteracao = !!atual && preco === precoOriginal && (isEquipamento || normalizarCustosExtra(custosExtra) === normalizarCustosExtra(custosExtraIniciais())) && (isEquipamento || normalizarDescontos(descontos) === normalizarDescontos(atual.descontos));
+  const precoFinal = calcularPrecoFinal({ preco, descontos, custosExtra });
   const submit = () => {
     if (!preco || parseFloat(preco) < 0) return setError("Indique o pre\xE7o");
     if (!dataEntradaVigor) return setError("Indique a data de entrada em vigor do pre\xE7o");
@@ -8919,7 +9137,7 @@ function AtualizarPrecoModal({ material, tipo, onSave, onClose }) {
     onSave(material.id, {
       preco: parseFloat(preco),
       descontos: isEquipamento ? [] : descontos.map((d) => ({ ...d, valor: parseFloat(d.valor) })),
-      custoTransporte: isEquipamento ? 0 : custoTransporte === "" ? 0 : parseFloat(custoTransporte),
+      custosExtra: isEquipamento ? [] : custosExtra.map((c) => ({ ...c, valor: parseFloat(c.valor) || 0 })),
       dataEntradaVigor
     });
   };
@@ -8951,38 +9169,25 @@ function AtualizarPrecoModal({ material, tipo, onSave, onClose }) {
         placeholder: "0.00"
       }
     ) }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-      /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
-        /* @__PURE__ */ jsx(Field, { label: rotuloPreco, children: /* @__PURE__ */ jsx(
-          "input",
-          {
-            value: preco,
-            onChange: (e) => setPreco(e.target.value),
-            type: "number",
-            step: "0.01",
-            min: "0",
-            autoFocus: true,
-            className: `${inputCls} font-mono-data ${preco === precoOriginal && atual ? "text-stone-400" : "text-stone-800"}`,
-            placeholder: "0.00"
-          }
-        ) }),
-        /* @__PURE__ */ jsx(Field, { label: "Custo de Transporte (\u20AC)", children: /* @__PURE__ */ jsx(
-          "input",
-          {
-            value: custoTransporte,
-            onChange: (e) => setCustoTransporte(e.target.value),
-            type: "number",
-            step: "0.01",
-            min: "0",
-            className: `${inputCls} font-mono-data ${custoTransporte === transporteOriginal && atual ? "text-stone-400" : "text-stone-800"}`,
-            placeholder: "0.00"
-          }
-        ) })
-      ] }),
-      /* @__PURE__ */ jsx(DescontosEditor, { descontos, onChange: setDescontos, categorias: tipo === "consumivel" ? DESCONTO_CATEGORIAS_CONSUMIVEL : DESCONTO_CATEGORIAS })
+      /* @__PURE__ */ jsx(Field, { label: rotuloPreco, children: /* @__PURE__ */ jsx(
+        "input",
+        {
+          value: preco,
+          onChange: (e) => setPreco(e.target.value),
+          type: "number",
+          step: "0.01",
+          min: "0",
+          autoFocus: true,
+          className: `${inputCls} font-mono-data ${preco === precoOriginal && atual ? "text-stone-400" : "text-stone-800"}`,
+          placeholder: "0.00"
+        }
+      ) }),
+      /* @__PURE__ */ jsx(CustosExtraEditor, { custosExtra, onChange: setCustosExtra, tipos: tiposCustoExtra }),
+      /* @__PURE__ */ jsx(DescontosEditor, { descontos, onChange: setDescontos, categorias: [...(tiposDesconto || []).map((t) => t.nome), "Outro"] })
     ] }),
     /* @__PURE__ */ jsx(Field, { label: "Data de Entrada em Vigor", children: /* @__PURE__ */ jsx("input", { type: "date", value: dataEntradaVigor, onChange: (e) => setDataEntradaVigor(e.target.value), className: inputCls }) }),
     !isEquipamento && /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-amber-50 rounded-lg px-4 py-2.5 mb-4", children: [
-      /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-amber-800", children: "Pre\xE7o final (com descontos e transporte)" }),
+      /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-amber-800", children: "Pre\xE7o final (com descontos, transporte e otimiza\xE7\xE3o)" }),
       /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-amber-800", children: [
         precoFinal.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
         " \u20AC"
@@ -9001,16 +9206,17 @@ function AtualizarPrecoModal({ material, tipo, onSave, onClose }) {
     )
   ] });
 }
-function EditarPrecoModal({ material, entry, tipo, onSave, onClose }) {
+function EditarPrecoModal({ material, entry, tipo, tiposDesconto, tiposCustoExtra, onSave, onClose }) {
   const isEquipamento = tipo === "equipamento" || tipo === "maodeobra";
   const isConsumivel = tipo === "consumivel";
   const rotuloPreco = isConsumivel ? `Pre\xE7o (\u20AC/${unidadeBaseCombustivel(material.unidadeCusto)})` : "Pre\xE7o (\u20AC)";
+  const custosExtraIniciais = () => custosExtraLista(entry).map((c) => ({ ...c, id: genId(), valor: String(c.valor) }));
   const [preco, setPreco] = useState(String(entry.preco ?? ""));
   const [descontos, setDescontos] = useState(entry.descontos ? entry.descontos.map((d) => ({ ...d, id: genId() })) : []);
-  const [custoTransporte, setCustoTransporte] = useState(String(entry.custoTransporte ?? 0));
+  const [custosExtra, setCustosExtra] = useState(custosExtraIniciais());
   const [dataEntradaVigor, setDataEntradaVigor] = useState(entry.dataEntradaVigor || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10));
   const [error, setError] = useState("");
-  const precoFinal = calcularPrecoFinal({ preco, descontos, custoTransporte });
+  const precoFinal = calcularPrecoFinal({ preco, descontos, custosExtra });
   const submit = () => {
     if (!preco || parseFloat(preco) < 0) return setError("Indique o pre\xE7o");
     if (!dataEntradaVigor) return setError("Indique a data de entrada em vigor do pre\xE7o");
@@ -9018,21 +9224,19 @@ function EditarPrecoModal({ material, entry, tipo, onSave, onClose }) {
     onSave(material.id, entry.id, {
       preco: parseFloat(preco),
       descontos: isEquipamento ? [] : descontos.map((d) => ({ ...d, valor: parseFloat(d.valor) })),
-      custoTransporte: isEquipamento ? 0 : custoTransporte === "" ? 0 : parseFloat(custoTransporte),
+      custosExtra: isEquipamento ? [] : custosExtra.map((c) => ({ ...c, valor: parseFloat(c.valor) || 0 })),
       dataEntradaVigor
     });
   };
   return /* @__PURE__ */ jsxs(Modal, { title: "Editar Atualiza\xE7\xE3o de Pre\xE7o", subtitle: material.designacao, onClose, children: [
     isEquipamento ? /* @__PURE__ */ jsx(Field, { label: "Pre\xE7o (\u20AC)", children: /* @__PURE__ */ jsx("input", { value: preco, onChange: (e) => setPreco(e.target.value), type: "number", step: "0.01", min: "0", autoFocus: true, className: `${inputCls} font-mono-data`, placeholder: "0.00" }) }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-      /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
-        /* @__PURE__ */ jsx(Field, { label: rotuloPreco, children: /* @__PURE__ */ jsx("input", { value: preco, onChange: (e) => setPreco(e.target.value), type: "number", step: "0.01", min: "0", autoFocus: true, className: `${inputCls} font-mono-data`, placeholder: "0.00" }) }),
-        /* @__PURE__ */ jsx(Field, { label: "Custo de Transporte (\u20AC)", children: /* @__PURE__ */ jsx("input", { value: custoTransporte, onChange: (e) => setCustoTransporte(e.target.value), type: "number", step: "0.01", min: "0", className: `${inputCls} font-mono-data`, placeholder: "0.00" }) })
-      ] }),
-      /* @__PURE__ */ jsx(DescontosEditor, { descontos, onChange: setDescontos, categorias: tipo === "consumivel" ? DESCONTO_CATEGORIAS_CONSUMIVEL : DESCONTO_CATEGORIAS })
+      /* @__PURE__ */ jsx(Field, { label: rotuloPreco, children: /* @__PURE__ */ jsx("input", { value: preco, onChange: (e) => setPreco(e.target.value), type: "number", step: "0.01", min: "0", autoFocus: true, className: `${inputCls} font-mono-data`, placeholder: "0.00" }) }),
+      /* @__PURE__ */ jsx(CustosExtraEditor, { custosExtra, onChange: setCustosExtra, tipos: tiposCustoExtra }),
+      /* @__PURE__ */ jsx(DescontosEditor, { descontos, onChange: setDescontos, categorias: [...(tiposDesconto || []).map((t) => t.nome), "Outro"] })
     ] }),
     /* @__PURE__ */ jsx(Field, { label: "Data de Entrada em Vigor", children: /* @__PURE__ */ jsx("input", { type: "date", value: dataEntradaVigor, onChange: (e) => setDataEntradaVigor(e.target.value), className: inputCls }) }),
     !isEquipamento && /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-amber-50 rounded-lg px-4 py-2.5 mb-4", children: [
-      /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-amber-800", children: "Pre\xE7o final (com descontos e transporte)" }),
+      /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-amber-800", children: "Pre\xE7o final (com descontos, transporte e otimiza\xE7\xE3o)" }),
       /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-amber-800", children: [
         precoFinal.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
         " \u20AC"
@@ -9093,7 +9297,7 @@ function HistoricoPrecosModal({ material, onDelete, onEdit, onClose }) {
         parseFloat(p.preco || 0).toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
         " \u20AC",
         (p.descontos || []).map((d) => ` \u2212 ${descontoTexto(d)}`).join(""),
-        parseFloat(p.custoTransporte) > 0 ? ` + transporte ${parseFloat(p.custoTransporte).toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : ""
+        custosExtraLista(p).map((c) => ` + ${c.nome.toLowerCase()} ${parseFloat(c.valor || 0).toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC`).join("")
       ] })
     ] }, p.id)) })
   ] }) });
