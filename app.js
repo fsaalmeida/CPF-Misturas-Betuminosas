@@ -4369,7 +4369,7 @@ function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra,
           /* @__PURE__ */ jsx(Calculator, { size: 15 }),
           " Custos de Todas as F\xF3rmulas"
         ] }),
-        isAdmin && /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
+        canManage && /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
           /* @__PURE__ */ jsx(Plus, { size: 15 }),
           " Nova F\xF3rmula"
         ] })
