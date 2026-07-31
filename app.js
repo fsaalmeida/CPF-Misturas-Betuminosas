@@ -4139,6 +4139,7 @@ function MaoDeObraItensCard({ center, maoDeObra, isAdmin, nomeUtilizadorAtual, o
         historico: itens.find((i) => i.id === itemHistorico.id)?.historico || [],
         isAdmin,
         onDelete: (entryId) => onUpdateItens(itens.map((i) => i.id === itemHistorico.id ? { ...i, historico: (i.historico || []).filter((h) => h.id !== entryId) } : i)),
+        onEdit: (entryId, quantidade, dataEntradaVigor) => onUpdateItens(itens.map((i) => i.id === itemHistorico.id ? { ...i, historico: (i.historico || []).map((h) => h.id === entryId ? { ...h, quantidade, dataEntradaVigor } : h) } : i)),
         onClose: () => setItemHistorico(null)
       }
     )
@@ -4163,26 +4164,60 @@ function AtualizarQuantidadeMaoObraModal({ nomeCategoria, valorAtual, onSave, on
     /* @__PURE__ */ jsx("button", { onClick: submit, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700", children: "Guardar" })
   ] });
 }
-function HistoricoQuantidadeMaoObraModal({ nomeCategoria, historico, isAdmin, onDelete, onClose }) {
+function EditarQuantidadeMaoObraModal({ nomeCategoria, entrada, onSave, onClose }) {
+  const [quantidade, setQuantidade] = useState(String(entrada.quantidade ?? ""));
+  const [dataEntradaVigor, setDataEntradaVigor] = useState(entrada.dataEntradaVigor || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10));
+  const [error, setError] = useState("");
+  const submit = () => {
+    if (!quantidade || parseFloat(quantidade) < 0) return setError("Indique a quantidade");
+    if (!dataEntradaVigor) return setError("Indique a data de entrada em vigor");
+    onSave(parseFloat(quantidade), dataEntradaVigor);
+  };
+  return /* @__PURE__ */ jsxs(Modal, { title: "Editar Registo de Quantidade", subtitle: nomeCategoria, onClose, children: [
+    /* @__PURE__ */ jsx(Field, { label: "Quantidade", children: /* @__PURE__ */ jsx("input", { value: quantidade, onChange: (e) => setQuantidade(e.target.value), type: "number", step: "1", min: "0", className: `${inputCls} font-mono-data`, placeholder: "0", autoFocus: true }) }),
+    /* @__PURE__ */ jsx(Field, { label: "Em Vigor Desde", children: /* @__PURE__ */ jsx("input", { type: "date", value: dataEntradaVigor, onChange: (e) => setDataEntradaVigor(e.target.value), className: inputCls }) }),
+    error && /* @__PURE__ */ jsx("p", { className: "text-red-600 text-sm mb-3", children: error }),
+    /* @__PURE__ */ jsx("button", { onClick: submit, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700", children: "Guardar Altera\xE7\xE3o" })
+  ] });
+}
+function HistoricoQuantidadeMaoObraModal({ nomeCategoria, historico, isAdmin, onDelete, onEdit, onClose }) {
   const ordenado = [...historico].sort((a, b) => (b.dataEntradaVigor || "").localeCompare(a.dataEntradaVigor || ""));
-  return /* @__PURE__ */ jsx(Modal, { title: "Hist\xF3rico de Quantidade", subtitle: nomeCategoria, onClose, children: ordenado.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-sm text-stone-500", children: "Ainda n\xE3o h\xE1 registos." }) : /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-hidden", children: ordenado.map((h, i) => /* @__PURE__ */ jsxs("div", { className: `flex items-center justify-between px-3 py-2.5 text-sm ${i !== ordenado.length - 1 ? "border-b border-stone-100" : ""} ${i === 0 ? "bg-amber-50/40" : ""}`, children: [
-    /* @__PURE__ */ jsxs("div", { children: [
-      /* @__PURE__ */ jsxs("p", { className: "font-mono-data font-semibold text-stone-800", children: [
-        h.quantidade,
-        " ",
-        /* @__PURE__ */ jsx("span", { className: "font-sans font-normal text-stone-400 text-xs", children: "elemento(s)" })
+  const [editando, setEditando] = useState(null);
+  return /* @__PURE__ */ jsxs(Modal, { title: "Hist\xF3rico de Quantidade", subtitle: nomeCategoria, onClose, children: [
+    ordenado.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-sm text-stone-500", children: "Ainda n\xE3o h\xE1 registos." }) : /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-hidden", children: ordenado.map((h, i) => /* @__PURE__ */ jsxs("div", { className: `flex items-center justify-between px-3 py-2.5 text-sm ${i !== ordenado.length - 1 ? "border-b border-stone-100" : ""} ${i === 0 ? "bg-amber-50/40" : ""}`, children: [
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsxs("p", { className: "font-mono-data font-semibold text-stone-800", children: [
+          h.quantidade,
+          " ",
+          /* @__PURE__ */ jsx("span", { className: "font-sans font-normal text-stone-400 text-xs", children: "elemento(s)" })
+        ] }),
+        /* @__PURE__ */ jsxs("p", { className: "text-xs text-stone-400", children: [
+          "Em vigor desde ",
+          formatDatePT(h.dataEntradaVigor),
+          " \xB7 registado ",
+          formatDateTimePT(h.dataRegisto),
+          " por ",
+          h.utilizador || "\u2014"
+        ] })
       ] }),
-      /* @__PURE__ */ jsxs("p", { className: "text-xs text-stone-400", children: [
-        "Em vigor desde ",
-        formatDatePT(h.dataEntradaVigor),
-        " \xB7 registado ",
-        formatDateTimePT(h.dataRegisto),
-        " por ",
-        h.utilizador || "\u2014"
+      isAdmin && /* @__PURE__ */ jsxs("div", { className: "flex gap-1 shrink-0", children: [
+        /* @__PURE__ */ jsx("button", { onClick: () => setEditando(h), className: "p-1.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg", children: /* @__PURE__ */ jsx(Pencil, { size: 14 }) }),
+        /* @__PURE__ */ jsx("button", { onClick: () => onDelete(h.id), className: "p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg", children: /* @__PURE__ */ jsx(Trash2, { size: 14 }) })
       ] })
-    ] }),
-    isAdmin && /* @__PURE__ */ jsx("button", { onClick: () => onDelete(h.id), className: "p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg shrink-0", children: /* @__PURE__ */ jsx(Trash2, { size: 14 }) })
-  ] }, h.id)) }) });
+    ] }, h.id)) }),
+    editando && /* @__PURE__ */ jsx(
+      EditarQuantidadeMaoObraModal,
+      {
+        nomeCategoria,
+        entrada: editando,
+        onSave: (quantidade, dataEntradaVigor) => {
+          onEdit(editando.id, quantidade, dataEntradaVigor);
+          setEditando(null);
+        },
+        onClose: () => setEditando(null)
+      }
+    )
+  ] });
 }
 function IncidenciasSection({ center, diarias, avarias, canManage, isAdmin, onBack, onAdd, onEdit, onDelete, onOpenDiaria, onOpenResolucao, onEditIncidenciaDiaria, onDeleteIncidenciaDiaria }) {
   const fmtDate = (iso) => iso ? formatDatePT(iso) : "\u2014";
