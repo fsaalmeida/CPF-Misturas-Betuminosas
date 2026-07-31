@@ -242,6 +242,7 @@ function LoginForm({ users, onLogin, onDefinePassword }) {
   const [matchedUser, setMatchedUser] = useState(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [lembrar, setLembrar] = useState(true);
   const [error, setError] = useState("");
   const digitsOnly = (v) => v.replace(/\D/g, "").slice(0, 4);
   const submitUsername = () => {
@@ -255,7 +256,7 @@ function LoginForm({ users, onLogin, onDefinePassword }) {
   const submitPassword = () => {
     setError("");
     if (password.length !== 4) return setError("A palavra-passe tem 4 n\xFAmeros");
-    const ok = onLogin(matchedUser, password);
+    const ok = onLogin(matchedUser, password, lembrar);
     if (ok === false) {
       setError("Palavra-passe incorreta");
       setPassword("");
@@ -314,6 +315,10 @@ function LoginForm({ users, onLogin, onDefinePassword }) {
           autoFocus: true
         }
       ) }),
+      /* @__PURE__ */ jsxs("label", { className: "flex items-center gap-2 mb-4 cursor-pointer", children: [
+        /* @__PURE__ */ jsx("input", { type: "checkbox", checked: lembrar, onChange: (e) => setLembrar(e.target.checked), className: "w-4 h-4 accent-amber-600 cursor-pointer" }),
+        /* @__PURE__ */ jsx("span", { className: "text-sm text-stone-400", children: "Lembrar-me neste dispositivo por 24 horas" })
+      ] }),
       error && /* @__PURE__ */ jsx("p", { className: "text-red-500 text-sm mb-3", children: error }),
       /* @__PURE__ */ jsx("button", { onClick: submitPassword, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700", children: "Entrar" }),
       /* @__PURE__ */ jsx("button", { onClick: irParaEsqueci, className: "w-full mt-3 py-1 text-sm text-amber-500 hover:text-amber-400", children: "Esqueci-me da palavra-passe" }),
@@ -512,6 +517,21 @@ function App() {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    if (currentUser || loading || users.length === 0) return;
+    try {
+      const guardada = JSON.parse(localStorage.getItem("sessaoLembrada") || "null");
+      if (guardada && guardada.expiraEm > Date.now()) {
+        const user = users.find((u) => u.id === guardada.userId);
+        if (user) setCurrentUser(user);
+        else localStorage.removeItem("sessaoLembrada");
+      } else if (guardada) {
+        localStorage.removeItem("sessaoLembrada");
+      }
+    } catch {
+      localStorage.removeItem("sessaoLembrada");
+    }
+  }, [users, loading, currentUser]);
   const persist = (key, value, setter) => {
     setter(value);
     const anterior = writeQueueRef.current[key] || Promise.resolve();
@@ -592,10 +612,15 @@ function App() {
   };
   const podeVerCentros = temPermissao("centrosProducao", "visualizar");
   const podeEditarCentros = temPermissao("centrosProducao", "editar");
-  const attemptLogin = (user, pin) => {
+  const attemptLogin = (user, pin, lembrar) => {
     if (user.pin === pin) {
       setCurrentUser(user);
       setView("centers");
+      if (lembrar) {
+        localStorage.setItem("sessaoLembrada", JSON.stringify({ userId: user.id, expiraEm: Date.now() + 24 * 60 * 60 * 1e3 }));
+      } else {
+        localStorage.removeItem("sessaoLembrada");
+      }
       return true;
     }
     return false;
@@ -606,6 +631,7 @@ function App() {
       const atualizado = prev.map((u) => u.id === user.id ? updated : u);
       persistRaw("users", atualizado);
       setCurrentUser(updated);
+      localStorage.setItem("sessaoLembrada", JSON.stringify({ userId: user.id, expiraEm: Date.now() + 24 * 60 * 60 * 1e3 }));
       return atualizado;
     });
     setView("centers");
@@ -638,6 +664,7 @@ function App() {
     setCurrentUser(null);
     setActiveCenterId(null);
     setView("centers");
+    localStorage.removeItem("sessaoLembrada");
   };
   const saveUser = (data) => {
     setUsers((prev) => {
