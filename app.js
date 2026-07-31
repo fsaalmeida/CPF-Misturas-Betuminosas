@@ -9628,17 +9628,24 @@ function AtualizarProducaoModal({ center, onSave, onClose }) {
 function EditarProducaoModal({ center, entry, onSave, onClose }) {
   const [ano, setAno] = useState(entry.ano);
   const [valor, setValor] = useState(String(entry.valor ?? ""));
+  const [dataRegisto, setDataRegisto] = useState((entry.dataRegisto || (/* @__PURE__ */ new Date()).toISOString()).slice(0, 10));
   const [error, setError] = useState("");
   const submit = () => {
     if (!ano || ano < 2e3 || ano > 2100) return setError("Indique um ano v\xE1lido");
     if (!valor || parseFloat(valor) <= 0) return setError("Indique a produ\xE7\xE3o estimada em toneladas");
-    onSave(center.id, entry.id, { ano: parseInt(ano, 10), valor: parseFloat(valor) });
+    if (!dataRegisto) return setError("Indique a data de registo");
+    onSave(center.id, entry.id, {
+      ano: parseInt(ano, 10),
+      valor: parseFloat(valor),
+      dataRegisto: `${dataRegisto}T${(entry.dataRegisto || "").slice(11) || "00:00:00.000Z"}`
+    });
   };
   return /* @__PURE__ */ jsxs(Modal, { title: "Editar Estimativa de Produ\xE7\xE3o", subtitle: center.nome, onClose, children: [
     /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
       /* @__PURE__ */ jsx(Field, { label: "Ano", children: /* @__PURE__ */ jsx("input", { value: ano, onChange: (e) => setAno(parseInt(e.target.value, 10) || ""), type: "number", className: `${inputCls} font-mono-data`, autoFocus: true }) }),
       /* @__PURE__ */ jsx(Field, { label: "Produ\xE7\xE3o estimada (toneladas)", children: /* @__PURE__ */ jsx("input", { value: valor, onChange: (e) => setValor(e.target.value), type: "number", step: "1", min: "0", className: `${inputCls} font-mono-data` }) })
     ] }),
+    /* @__PURE__ */ jsx(Field, { label: "Data de Registo", children: /* @__PURE__ */ jsx("input", { type: "date", value: dataRegisto, onChange: (e) => setDataRegisto(e.target.value), className: inputCls }) }),
     error && /* @__PURE__ */ jsx("p", { className: "text-red-600 text-sm mb-3", children: error }),
     /* @__PURE__ */ jsx("button", { onClick: submit, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700", children: "Guardar altera\xE7\xF5es" })
   ] });
