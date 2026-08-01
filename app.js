@@ -421,6 +421,7 @@ function App() {
   const [tiposMaterial, setTiposMaterial] = useState([]);
   const [tiposDesconto, setTiposDesconto] = useState([]);
   const [tiposCustoExtra, setTiposCustoExtra] = useState([]);
+  const [perfisPersonalizados, setPerfisPersonalizados] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [activeCenterId, setActiveCenterId] = useState(null);
   const [view, setView] = useState("centers");
@@ -434,7 +435,7 @@ function App() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [u, c, m, p, cl, cc, d, f, av, mat, forn, cons, rec, equip, ajust, logo, dop, mo, perm, tipMat, tipDesc, tipCustoExtra] = await Promise.allSettled([
+      const [u, c, m, p, cl, cc, d, f, av, mat, forn, cons, rec, equip, ajust, logo, dop, mo, perm, tipMat, tipDesc, tipCustoExtra, perfisPers] = await Promise.allSettled([
         window.storage.get("users", true),
         window.storage.get("centers", true),
         window.storage.get("mixtures", true),
@@ -456,7 +457,8 @@ function App() {
         window.storage.get("permissoes", true),
         window.storage.get("tiposMaterial", true),
         window.storage.get("tiposDesconto", true),
-        window.storage.get("tiposCustoExtra", true)
+        window.storage.get("tiposCustoExtra", true),
+        window.storage.get("perfisPersonalizados", true)
       ]);
       setUsers(u.status === "fulfilled" && u.value ? JSON.parse(u.value.value) : []);
       setCenters(c.status === "fulfilled" && c.value ? JSON.parse(c.value.value) : []);
@@ -476,6 +478,7 @@ function App() {
       setLogotipoState(logo.status === "fulfilled" && logo.value ? JSON.parse(logo.value.value) : "");
       setDopConfig(dop.status === "fulfilled" && dop.value ? JSON.parse(dop.value.value) : null);
       setMaoDeObra(mo.status === "fulfilled" && mo.value ? JSON.parse(mo.value.value) : []);
+      setPerfisPersonalizados(perfisPers.status === "fulfilled" && perfisPers.value ? JSON.parse(perfisPers.value.value) : []);
       const permissoesGuardadas = perm.status === "fulfilled" && perm.value ? JSON.parse(perm.value.value) : {};
       const permissoesFinais = {};
       ROLES.forEach((r) => {
@@ -564,7 +567,11 @@ function App() {
       maoDeObra,
       ajustesStock,
       logotipo,
-      dopConfig
+      dopConfig,
+      tiposMaterial,
+      tiposDesconto,
+      tiposCustoExtra,
+      perfisPersonalizados
     };
     const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -595,7 +602,11 @@ function App() {
       ["maoDeObra", dados.maoDeObra, setMaoDeObra],
       ["ajustesStock", dados.ajustesStock, setAjustesStock],
       ["logotipo", dados.logotipo, setLogotipoState],
-      ["dopConfig", dados.dopConfig, setDopConfig]
+      ["dopConfig", dados.dopConfig, setDopConfig],
+      ["tiposMaterial", dados.tiposMaterial, setTiposMaterial],
+      ["tiposDesconto", dados.tiposDesconto, setTiposDesconto],
+      ["tiposCustoExtra", dados.tiposCustoExtra, setTiposCustoExtra],
+      ["perfisPersonalizados", dados.perfisPersonalizados, setPerfisPersonalizados]
     ];
     mapa.forEach(([key, value, setter]) => {
       if (value !== void 0) persist(key, value, setter);
@@ -606,6 +617,10 @@ function App() {
   const canManageArticles = isAdmin || currentUser?.role === "Gestor";
   const podeRegistar = canManageArticles || currentUser?.role === "Operador";
   const podeVerCustos = canManageArticles || currentUser?.role === "Or\xE7amentista";
+  const podeVerClientesFornecedores = canManageArticles || currentUser?.role === "Or\xE7amentista" || currentUser?.role === "Operador";
+  const podeGerirObras = canManageArticles || currentUser?.role === "Or\xE7amentista";
+  const podeVerMateriais = isAdmin || currentUser?.role === "Or\xE7amentista";
+  const podeAtualizarPrecoMateriais = isAdmin || currentUser?.role === "Or\xE7amentista";
   const temPermissao = (menu, acao) => {
     if (isAdmin) return true;
     return !!permissoes[currentUser?.role]?.[menu]?.[acao];
@@ -753,6 +768,29 @@ function App() {
       });
       setConfirmDialog(null);
     });
+  };
+  const saveNovoPerfil = (nome) => {
+    setPerfisPersonalizados((prev) => {
+      const atualizado = [...prev, { id: genId(), nome }];
+      persistRaw("perfisPersonalizados", atualizado);
+      return atualizado;
+    });
+    setModal(null);
+  };
+  const deletePerfilPersonalizado = (id) => {
+    const target = perfisPersonalizados.find((p) => p.id === id);
+    const emUso = users.filter((u) => u.role === target?.nome);
+    askConfirm(
+      emUso.length > 0 ? `Eliminar o perfil "${target?.nome}"? ${emUso.length} utilizador${emUso.length > 1 ? "es t\xEAm" : " tem"} este perfil e ficar\xE1(\xE3o) sem acesso at\xE9 lhe(s) atribuir outro.` : `Eliminar o perfil "${target?.nome}"?`,
+      () => {
+        setPerfisPersonalizados((prev) => {
+          const atualizado = prev.filter((p) => p.id !== id);
+          persistRaw("perfisPersonalizados", atualizado);
+          return atualizado;
+        });
+        setConfirmDialog(null);
+      }
+    );
   };
   const saveCenter = (data) => {
     if (data.id) {
@@ -1700,7 +1738,7 @@ function App() {
             ]
           }
         ),
-        canManageArticles && /* @__PURE__ */ jsxs(
+        podeVerClientesFornecedores && /* @__PURE__ */ jsxs(
           "button",
           {
             onClick: () => {
@@ -1725,7 +1763,7 @@ function App() {
             ]
           }
         ),
-        canManageArticles && /* @__PURE__ */ jsxs(
+        podeVerClientesFornecedores && /* @__PURE__ */ jsxs(
           "button",
           {
             onClick: () => setView("fornecedores"),
@@ -1736,7 +1774,7 @@ function App() {
             ]
           }
         ),
-        isAdmin && /* @__PURE__ */ jsxs(
+        podeVerMateriais && /* @__PURE__ */ jsxs(
           "button",
           {
             onClick: () => setView("materiais"),
@@ -1842,10 +1880,13 @@ function App() {
           users,
           isAdmin,
           currentUserRole: currentUser?.role,
+          perfisPersonalizados,
           onAdd: () => setModal({ type: "user" }),
           onEdit: (u) => setModal({ type: "user", data: u }),
           onDelete: deleteUser,
-          onBack: () => setView("centers")
+          onBack: () => setView("centers"),
+          onSavePerfil: saveNovoPerfil,
+          onDeletePerfil: deletePerfilPersonalizado
         }
       ),
       view === "centers" && /* @__PURE__ */ jsx(
@@ -1944,11 +1985,12 @@ function App() {
           onDeleteRececao: deleteRececao
         }
       ),
-      view === "clientes" && canManageArticles && /* @__PURE__ */ jsx(
+      view === "clientes" && podeVerClientesFornecedores && /* @__PURE__ */ jsx(
         ClientesView,
         {
           clientes,
           centrosCusto,
+          canManage: canManageArticles,
           onAdd: () => setModal({ type: "cliente" }),
           onImport: () => setModal({ type: "importClientes" }),
           onOpen: (id) => {
@@ -1959,10 +2001,11 @@ function App() {
           onBack: () => setView("centers")
         }
       ),
-      view === "fornecedores" && canManageArticles && /* @__PURE__ */ jsx(
+      view === "fornecedores" && podeVerClientesFornecedores && /* @__PURE__ */ jsx(
         FornecedoresView,
         {
           fornecedores,
+          canManage: canManageArticles,
           onAdd: () => setModal({ type: "fornecedor" }),
           onEdit: (f) => setModal({ type: "fornecedor", data: f }),
           onImport: () => setModal({ type: "importFornecedores" }),
@@ -1970,7 +2013,7 @@ function App() {
           onBack: () => setView("centers")
         }
       ),
-      view === "materiais" && isAdmin && /* @__PURE__ */ jsx(
+      view === "materiais" && podeVerMateriais && /* @__PURE__ */ jsx(
         MateriaisView,
         {
           materiais,
@@ -1978,6 +2021,7 @@ function App() {
           tiposMaterial,
           tiposDesconto,
           tiposCustoExtra,
+          isAdmin,
           onAdd: () => setModal({ type: "material" }),
           onEdit: (m) => setModal({ type: "material", data: m }),
           onDelete: deleteMaterial,
@@ -2003,6 +2047,7 @@ function App() {
           centers,
           tiposDesconto,
           tiposCustoExtra,
+          isAdmin,
           onAdd: () => setModal({ type: "consumivel" }),
           onEdit: (m) => setModal({ type: "consumivel", data: m }),
           onDelete: deleteConsumivel,
@@ -2024,6 +2069,7 @@ function App() {
           tipo: "equipamento",
           materiais: equipamentos,
           centers,
+          isAdmin,
           onAdd: () => setModal({ type: "equipamento" }),
           onEdit: (m) => setModal({ type: "equipamento", data: m }),
           onDelete: deleteEquipamento,
@@ -2041,6 +2087,7 @@ function App() {
           tipo: "maodeobra",
           materiais: maoDeObra,
           centers,
+          isAdmin,
           onAdd: () => setModal({ type: "maodeobra" }),
           onEdit: (m) => setModal({ type: "maodeobra", data: m }),
           onDelete: deleteMaoDeObra,
@@ -2057,7 +2104,7 @@ function App() {
         {
           cliente: clienteSocorpena,
           centrosCusto: centrosCustoSocorpena,
-          isAdmin: canManageArticles,
+          isAdmin: podeGerirObras,
           onAdd: () => setModal({ type: "centroCusto", data: { clienteId: clienteSocorpena.id } }),
           onEdit: (cc) => setModal({ type: "centroCusto", data: cc }),
           onDelete: deleteCentroCusto,
@@ -2068,11 +2115,12 @@ function App() {
           onBack: () => setView("centers")
         }
       ),
-      view === "clienteDetail" && selectedCliente && canManageArticles && /* @__PURE__ */ jsx(
+      view === "clienteDetail" && selectedCliente && podeVerClientesFornecedores && /* @__PURE__ */ jsx(
         ClienteDetail,
         {
           cliente: selectedCliente,
           centrosCusto: centrosCusto.filter((cc) => cc.clienteId === selectedCliente.id),
+          canManage: canManageArticles,
           onBack: () => {
             setView("clientes");
             setSelectedClienteId(null);
@@ -2087,7 +2135,7 @@ function App() {
         }
       )
     ] }),
-    modal?.type === "user" && /* @__PURE__ */ jsx(UserModal, { data: modal.data, centers, isAdmin, currentUserRole: currentUser?.role, onSave: saveUser, onResetPin: resetUserPin, onSetPin: setUserPin, onClose: () => setModal(null) }),
+    modal?.type === "user" && /* @__PURE__ */ jsx(UserModal, { data: modal.data, centers, isAdmin, currentUserRole: currentUser?.role, perfisPersonalizados, onSave: saveUser, onResetPin: resetUserPin, onSetPin: setUserPin, onClose: () => setModal(null) }),
     modal?.type === "logotipo" && /* @__PURE__ */ jsx(LogotipoModal, { logotipoAtual: logotipo, onSave: saveLogotipo, onRemove: removeLogotipo, onClose: () => setModal(null) }),
     modal?.type === "dopConfig" && /* @__PURE__ */ jsx(DopConfigModal, { dopConfig, onSave: saveDopConfig, onClose: () => setModal(null) }),
     modal?.type === "backup" && /* @__PURE__ */ jsx(BackupModal, { onExport: exportarBackupCompleto, onImport: importarBackupCompleto, onClose: () => setModal(null) }),
@@ -2253,25 +2301,25 @@ function App() {
     modal?.type === "cliente" && /* @__PURE__ */ jsx(ClienteModal, { data: modal.data, onSave: saveCliente, onClose: () => setModal(null) }),
     modal?.type === "material" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tiposDesconto, tiposCustoExtra, tiposMaterial, onSave: saveMaterial, onClose: () => setModal(null) }),
     modal?.type === "precoMaterial" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, tiposDesconto, tiposCustoExtra, onSave: addPrecoMaterial, onClose: () => setModal(null) }),
-    modal?.type === "historicoMaterial" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, onDelete: deletePrecoMaterial, onEdit: (material, entry) => setModal({ type: "editarPreco", data: { material, entry } }), onClose: () => setModal(null) }),
+    modal?.type === "historicoMaterial" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, isAdmin, onDelete: deletePrecoMaterial, onEdit: (material, entry) => setModal({ type: "editarPreco", data: { material, entry } }), onClose: () => setModal(null) }),
     modal?.type === "editarPreco" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, tiposDesconto, tiposCustoExtra, onSave: editarPrecoMaterial, onClose: () => setModal({ type: "historicoMaterial", data: modal.data.material }) }),
     modal?.type === "escolherMaterial" && /* @__PURE__ */ jsx(EscolherMaterialModal, { materiais, onChoose: (m) => setModal({ type: "precoMaterial", data: m }), onClose: () => setModal(null) }),
     modal?.type === "importMateriais" && /* @__PURE__ */ jsx(ImportMateriaisModal, { materiaisExistentes: materiais, onImport: importMateriaisPrecos, onClose: () => setModal(null) }),
     modal?.type === "consumivel" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tiposDesconto, tiposCustoExtra, tipo: "consumivel", onSave: saveConsumivel, onClose: () => setModal(null) }),
     modal?.type === "precoConsumivel" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, tiposDesconto, tiposCustoExtra, tipo: "consumivel", onSave: addPrecoConsumivel, onClose: () => setModal(null) }),
-    modal?.type === "historicoConsumivel" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, onDelete: deletePrecoConsumivel, onEdit: (material, entry) => setModal({ type: "editarPrecoConsumivel", data: { material, entry } }), onClose: () => setModal(null) }),
+    modal?.type === "historicoConsumivel" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, isAdmin, onDelete: deletePrecoConsumivel, onEdit: (material, entry) => setModal({ type: "editarPrecoConsumivel", data: { material, entry } }), onClose: () => setModal(null) }),
     modal?.type === "editarPrecoConsumivel" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, tiposDesconto, tiposCustoExtra, tipo: "consumivel", onSave: editarPrecoConsumivel, onClose: () => setModal({ type: "historicoConsumivel", data: modal.data.material }) }),
     modal?.type === "escolherConsumivel" && /* @__PURE__ */ jsx(EscolherMaterialModal, { materiais: consumiveis, tipo: "consumivel", onChoose: (c) => setModal({ type: "precoConsumivel", data: c }), onClose: () => setModal(null) }),
     modal?.type === "importConsumiveis" && /* @__PURE__ */ jsx(ImportMateriaisModal, { materiaisExistentes: consumiveis, tipo: "consumivel", onImport: importConsumiveisPrecos, onClose: () => setModal(null) }),
     modal?.type === "equipamento" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tiposDesconto, tiposCustoExtra, tipo: "equipamento", onSave: saveEquipamento, onClose: () => setModal(null) }),
     modal?.type === "precoEquipamento" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, tiposDesconto, tiposCustoExtra, tipo: "equipamento", onSave: addPrecoEquipamento, onClose: () => setModal(null) }),
-    modal?.type === "historicoEquipamento" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, onDelete: deletePrecoEquipamento, onEdit: (material, entry) => setModal({ type: "editarPrecoEquipamento", data: { material, entry } }), onClose: () => setModal(null) }),
+    modal?.type === "historicoEquipamento" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, isAdmin, onDelete: deletePrecoEquipamento, onEdit: (material, entry) => setModal({ type: "editarPrecoEquipamento", data: { material, entry } }), onClose: () => setModal(null) }),
     modal?.type === "editarPrecoEquipamento" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, tiposDesconto, tiposCustoExtra, tipo: "equipamento", onSave: editarPrecoEquipamento, onClose: () => setModal({ type: "historicoEquipamento", data: modal.data.material }) }),
     modal?.type === "escolherEquipamento" && /* @__PURE__ */ jsx(EscolherMaterialModal, { materiais: equipamentos, tipo: "equipamento", onChoose: (eq) => setModal({ type: "precoEquipamento", data: eq }), onClose: () => setModal(null) }),
     modal?.type === "importEquipamentos" && /* @__PURE__ */ jsx(ImportMateriaisModal, { materiaisExistentes: equipamentos, tipo: "equipamento", onImport: importEquipamentosPrecos, onClose: () => setModal(null) }),
     modal?.type === "maodeobra" && /* @__PURE__ */ jsx(MaterialModal, { data: modal.data, centers, fornecedores, tiposDesconto, tiposCustoExtra, tipo: "maodeobra", onSave: saveMaoDeObra, onClose: () => setModal(null) }),
     modal?.type === "precoMaoObra" && /* @__PURE__ */ jsx(AtualizarPrecoModal, { material: modal.data, tiposDesconto, tiposCustoExtra, tipo: "maodeobra", onSave: addPrecoMaoObra, onClose: () => setModal(null) }),
-    modal?.type === "historicoMaoObra" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, onDelete: deletePrecoMaoObra, onEdit: (material, entry) => setModal({ type: "editarPrecoMaoObra", data: { material, entry } }), onClose: () => setModal(null) }),
+    modal?.type === "historicoMaoObra" && /* @__PURE__ */ jsx(HistoricoPrecosModal, { material: modal.data, isAdmin, onDelete: deletePrecoMaoObra, onEdit: (material, entry) => setModal({ type: "editarPrecoMaoObra", data: { material, entry } }), onClose: () => setModal(null) }),
     modal?.type === "editarPrecoMaoObra" && /* @__PURE__ */ jsx(EditarPrecoModal, { material: modal.data.material, entry: modal.data.entry, tiposDesconto, tiposCustoExtra, tipo: "maodeobra", onSave: editarPrecoMaoObra, onClose: () => setModal({ type: "historicoMaoObra", data: modal.data.material }) }),
     modal?.type === "escolherMaoObra" && /* @__PURE__ */ jsx(EscolherMaterialModal, { materiais: maoDeObra, tipo: "maodeobra", onChoose: (mo) => setModal({ type: "precoMaoObra", data: mo }), onClose: () => setModal(null) }),
     modal?.type === "importMaoObra" && /* @__PURE__ */ jsx(ImportMateriaisModal, { materiaisExistentes: maoDeObra, tipo: "maodeobra", onImport: importMaoDeObraPrecos, onClose: () => setModal(null) }),
@@ -2321,7 +2369,8 @@ function SetupForm({ onSubmit }) {
     /* @__PURE__ */ jsx("button", { onClick: submit, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700", children: "Criar Administrador" })
   ] });
 }
-function UsersView({ users, isAdmin, currentUserRole, onAdd, onEdit, onDelete, onBack }) {
+function UsersView({ users, isAdmin, currentUserRole, perfisPersonalizados, onAdd, onEdit, onDelete, onBack, onSavePerfil, onDeletePerfil }) {
+  const [mostrarPerfis, setMostrarPerfis] = useState(false);
   const scopeText = { "Gestor": "Todos os centros", "Operador": "Por calend\xE1rio", "Or\xE7amentista": "Apenas consulta", "Convidado": "Apenas consulta" };
   const usersOrdenados = [...users].sort(
     (a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role) || (a.nome || "").localeCompare(b.nome || "", "pt", { sensitivity: "base" })
@@ -2337,11 +2386,37 @@ function UsersView({ users, isAdmin, currentUserRole, onAdd, onEdit, onDelete, o
         /* @__PURE__ */ jsx("p", { className: "font-display text-xs tracking-[0.2em] text-amber-600 uppercase mb-1", children: "Equipa" }),
         /* @__PURE__ */ jsx("h2", { className: "font-display text-2xl text-stone-900 font-semibold", children: "Utilizadores" })
       ] }),
-      isAdmin && /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
-        /* @__PURE__ */ jsx(Plus, { size: 16 }),
-        " Novo Utilizador"
+      isAdmin && /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
+        /* @__PURE__ */ jsxs("button", { onClick: () => setMostrarPerfis(true), className: "flex items-center gap-1.5 px-4 py-2.5 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
+          /* @__PURE__ */ jsx(Plus, { size: 16 }),
+          " Novo Perfil"
+        ] }),
+        /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
+          /* @__PURE__ */ jsx(Plus, { size: 16 }),
+          " Novo Utilizador"
+        ] })
       ] })
     ] }),
+    mostrarPerfis && /* @__PURE__ */ jsx(
+      GerirTiposModal,
+      {
+        titulo: "Perfis Personalizados",
+        subtitulo: "Utilizadores",
+        descricao: /* @__PURE__ */ jsxs(Fragment, { children: [
+          "Al\xE9m dos perfis base (Administrador, Gestor, Operador, Or\xE7amentista, Convidado), pode criar outros nomes de perfil aqui.",
+          /* @__PURE__ */ jsxs("span", { className: "block mt-1 text-amber-700", children: [
+            "Aten\xE7\xE3o: um perfil novo fica dispon\xEDvel para escolher, mas ",
+            /* @__PURE__ */ jsx("strong", { children: "n\xE3o tem permiss\xF5es pr\xF3prias definidas" }),
+            " \u2014 funciona como o mais restrito, at\xE9 me pedir para lhe atribuir regras espec\xEDficas (visualizar centros, criar di\xE1rias, etc.)."
+          ] })
+        ] }),
+        tipos: perfisPersonalizados || [],
+        placeholderNovo: "Nome do novo perfil (ex: Chefe de Central)",
+        onSave: (data) => onSavePerfil(data.nome),
+        onDelete: onDeletePerfil,
+        onClose: () => setMostrarPerfis(false)
+      }
+    ),
     /* @__PURE__ */ jsx("div", { className: "bg-white rounded-xl border border-stone-200 overflow-hidden", children: usersOrdenados.map((u, i) => /* @__PURE__ */ jsxs("div", { className: `flex items-center justify-between px-5 py-4 ${i !== usersOrdenados.length - 1 ? "border-b border-stone-100" : ""}`, children: [
       /* @__PURE__ */ jsxs("div", { children: [
         /* @__PURE__ */ jsx("p", { className: "font-display font-medium text-stone-900", children: u.nome }),
@@ -2574,7 +2649,7 @@ function ObrasView({ cliente, centrosCusto, isAdmin, onAdd, onEdit, onDelete, on
     ] })
   ] });
 }
-function ClientesView({ clientes, centrosCusto, onAdd, onImport, onOpen, onDelete, onBack }) {
+function ClientesView({ clientes, centrosCusto, canManage, onAdd, onImport, onOpen, onDelete, onBack }) {
   const [query, setQuery] = useState("");
   const filtrados = (query ? clientes.filter((c) => matchesSearch(query, c.designacao, c.nif, c.numero)) : clientes).slice().sort((a, b) => (a.numero || "").localeCompare(b.numero || "", "pt", { numeric: true, sensitivity: "base" }));
   return /* @__PURE__ */ jsxs("div", { className: "p-8 max-w-4xl", children: [
@@ -2604,11 +2679,11 @@ function ClientesView({ clientes, centrosCusto, onAdd, onImport, onOpen, onDelet
             ]
           }
         ),
-        /* @__PURE__ */ jsxs("button", { onClick: onImport, className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
+        canManage && /* @__PURE__ */ jsxs("button", { onClick: onImport, className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
           /* @__PURE__ */ jsx(FileSpreadsheet, { size: 15 }),
           " Importar Excel"
         ] }),
-        /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
+        canManage && /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
           /* @__PURE__ */ jsx(Plus, { size: 16 }),
           " Novo Cliente"
         ] })
@@ -2667,7 +2742,7 @@ function ClientesView({ clientes, centrosCusto, onAdd, onImport, onOpen, onDelet
               ] })
             ] }),
             /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1 shrink-0", children: [
-              /* @__PURE__ */ jsx(
+              canManage && /* @__PURE__ */ jsx(
                 "span",
                 {
                   onClick: (e) => {
@@ -2687,7 +2762,7 @@ function ClientesView({ clientes, centrosCusto, onAdd, onImport, onOpen, onDelet
     }) })
   ] });
 }
-function FornecedoresView({ fornecedores, onAdd, onEdit, onImport, onDelete, onBack }) {
+function FornecedoresView({ fornecedores, canManage, onAdd, onEdit, onImport, onDelete, onBack }) {
   const [query, setQuery] = useState("");
   const filtrados = (query ? fornecedores.filter((f) => matchesSearch(query, f.designacao, f.nif, f.numero)) : fornecedores).slice().sort((a, b) => (a.numero || "").localeCompare(b.numero || "", "pt", { numeric: true, sensitivity: "base" }));
   return /* @__PURE__ */ jsxs("div", { className: "p-8 max-w-4xl", children: [
@@ -2717,11 +2792,11 @@ function FornecedoresView({ fornecedores, onAdd, onEdit, onImport, onDelete, onB
             ]
           }
         ),
-        /* @__PURE__ */ jsxs("button", { onClick: onImport, className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
+        canManage && /* @__PURE__ */ jsxs("button", { onClick: onImport, className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
           /* @__PURE__ */ jsx(FileSpreadsheet, { size: 15 }),
           " Importar Excel"
         ] }),
-        /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
+        canManage && /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
           /* @__PURE__ */ jsx(Plus, { size: 16 }),
           " Novo Fornecedor"
         ] })
@@ -2768,14 +2843,14 @@ function FornecedoresView({ fornecedores, onAdd, onEdit, onImport, onDelete, onB
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs("div", { className: "flex gap-1 shrink-0", children: [
+      canManage && /* @__PURE__ */ jsxs("div", { className: "flex gap-1 shrink-0", children: [
         /* @__PURE__ */ jsx("button", { onClick: () => onEdit(f), className: "p-1.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg", children: /* @__PURE__ */ jsx(Pencil, { size: 14 }) }),
         /* @__PURE__ */ jsx("button", { onClick: () => onDelete(f.id), className: "p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg", children: /* @__PURE__ */ jsx(Trash2, { size: 14 }) })
       ] })
     ] }, f.id)) })
   ] });
 }
-function MateriaisView({ tipo, materiais, centers, tiposMaterial, tiposDesconto, tiposCustoExtra, onAdd, onEdit, onDelete, onAddPreco, onViewHistorico, onUpdatePricePicker, onImportPrecos, onDuplicate, onBack, onSaveTipoMaterial, onDeleteTipoMaterial, onSaveTipoDesconto, onDeleteTipoDesconto, onSaveTipoCustoExtra, onDeleteTipoCustoExtra }) {
+function MateriaisView({ tipo, materiais, centers, tiposMaterial, tiposDesconto, tiposCustoExtra, isAdmin, onAdd, onEdit, onDelete, onAddPreco, onViewHistorico, onUpdatePricePicker, onImportPrecos, onDuplicate, onBack, onSaveTipoMaterial, onDeleteTipoMaterial, onSaveTipoDesconto, onDeleteTipoDesconto, onSaveTipoCustoExtra, onDeleteTipoCustoExtra }) {
   const [query, setQuery] = useState("");
   const [mostrarTipos, setMostrarTipos] = useState(false);
   const [mostrarDescontos, setMostrarDescontos] = useState(false);
@@ -2842,11 +2917,11 @@ function MateriaisView({ tipo, materiais, centers, tiposMaterial, tiposDesconto,
         /* @__PURE__ */ jsx("h2", { className: "font-display text-2xl text-stone-900 font-semibold", children: nomePlural })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
-        isMaterial && /* @__PURE__ */ jsxs("button", { onClick: () => setMostrarTipos(true), className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
+        isAdmin && isMaterial && /* @__PURE__ */ jsxs("button", { onClick: () => setMostrarTipos(true), className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
           /* @__PURE__ */ jsx(Settings, { size: 15 }),
           " Gerir Tipos"
         ] }),
-        (isMaterial || isConsumivel) && /* @__PURE__ */ jsxs(Fragment, { children: [
+        isAdmin && (isMaterial || isConsumivel) && /* @__PURE__ */ jsxs(Fragment, { children: [
           /* @__PURE__ */ jsxs("button", { onClick: () => setMostrarDescontos(true), className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
             /* @__PURE__ */ jsx(Settings, { size: 15 }),
             " Gerir Descontos"
@@ -2860,7 +2935,7 @@ function MateriaisView({ tipo, materiais, centers, tiposMaterial, tiposDesconto,
           /* @__PURE__ */ jsx(FileSpreadsheet, { size: 15 }),
           " Exportar Excel"
         ] }),
-        /* @__PURE__ */ jsxs("button", { onClick: onImportPrecos, className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
+        isAdmin && /* @__PURE__ */ jsxs("button", { onClick: onImportPrecos, className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
           /* @__PURE__ */ jsx(FileSpreadsheet, { size: 15 }),
           " Importar Excel"
         ] }),
@@ -2868,7 +2943,7 @@ function MateriaisView({ tipo, materiais, centers, tiposMaterial, tiposDesconto,
           /* @__PURE__ */ jsx(TrendingUp, { size: 15 }),
           " Atualizar Pre\xE7o"
         ] }),
-        /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
+        isAdmin && /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
           /* @__PURE__ */ jsx(Plus, { size: 16 }),
           " Novo ",
           nomeBotaoNovo
@@ -2973,15 +3048,17 @@ function MateriaisView({ tipo, materiais, centers, tiposMaterial, tiposDesconto,
             /* @__PURE__ */ jsx(History, { size: 15 }),
             nHistorico > 0 && /* @__PURE__ */ jsx("span", { className: "absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-600 text-white text-[9px] font-bold flex items-center justify-center", children: nHistorico })
           ] }),
-          /* @__PURE__ */ jsx("button", { onClick: () => onDuplicate(m), title: `Duplicar ${nomeSingular.toLowerCase()} (incluindo hist\xF3rico de pre\xE7os)`, className: "p-1.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg", children: /* @__PURE__ */ jsx(Copy, { size: 14 }) }),
-          /* @__PURE__ */ jsx("button", { onClick: () => onEdit(m), className: "p-1.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg", children: /* @__PURE__ */ jsx(Pencil, { size: 14 }) }),
-          /* @__PURE__ */ jsx("button", { onClick: () => onDelete(m.id), className: "p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg", children: /* @__PURE__ */ jsx(Trash2, { size: 14 }) })
+          isAdmin && /* @__PURE__ */ jsxs(Fragment, { children: [
+            /* @__PURE__ */ jsx("button", { onClick: () => onDuplicate(m), title: `Duplicar ${nomeSingular.toLowerCase()} (incluindo hist\xF3rico de pre\xE7os)`, className: "p-1.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg", children: /* @__PURE__ */ jsx(Copy, { size: 14 }) }),
+            /* @__PURE__ */ jsx("button", { onClick: () => onEdit(m), className: "p-1.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg", children: /* @__PURE__ */ jsx(Pencil, { size: 14 }) }),
+            /* @__PURE__ */ jsx("button", { onClick: () => onDelete(m.id), className: "p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg", children: /* @__PURE__ */ jsx(Trash2, { size: 14 }) })
+          ] })
         ] })
       ] }) }, m.id);
     }) })
   ] });
 }
-function ClienteDetail({ cliente, centrosCusto, onBack, onEditCliente, onDeleteCliente, onAddCentroCusto, onEditCentroCusto, onDeleteCentroCusto, onToggleCentroCustoStatus, onImportCentrosCusto }) {
+function ClienteDetail({ cliente, centrosCusto, canManage, onBack, onEditCliente, onDeleteCliente, onAddCentroCusto, onEditCentroCusto, onDeleteCentroCusto, onToggleCentroCustoStatus, onImportCentrosCusto }) {
   return /* @__PURE__ */ jsxs("div", { className: "p-8 max-w-4xl", children: [
     /* @__PURE__ */ jsxs("button", { onClick: onBack, className: "flex items-center gap-1 text-sm text-stone-500 hover:text-amber-600 mb-4 font-medium", children: [
       /* @__PURE__ */ jsx(ChevronLeft, { size: 16 }),
@@ -3007,7 +3084,7 @@ function ClienteDetail({ cliente, centrosCusto, onBack, onEditCliente, onDeleteC
           cliente.morada
         ] })
       ] }),
-      /* @__PURE__ */ jsxs("div", { className: "flex gap-1", children: [
+      canManage && /* @__PURE__ */ jsxs("div", { className: "flex gap-1", children: [
         /* @__PURE__ */ jsx("button", { onClick: onEditCliente, className: "p-2 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg", children: /* @__PURE__ */ jsx(Pencil, { size: 16 }) }),
         /* @__PURE__ */ jsx("button", { onClick: onDeleteCliente, className: "p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg", children: /* @__PURE__ */ jsx(Trash2, { size: 16 }) })
       ] })
@@ -3017,7 +3094,7 @@ function ClienteDetail({ cliente, centrosCusto, onBack, onEditCliente, onDeleteC
         /* @__PURE__ */ jsx(MapPin, { size: 17, className: "text-amber-600" }),
         " Centros de Custo"
       ] }),
-      /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
+      canManage && /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
         /* @__PURE__ */ jsxs("button", { onClick: onImportCentrosCusto, className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
           /* @__PURE__ */ jsx(FileSpreadsheet, { size: 15 }),
           " Importar Excel"
@@ -3044,7 +3121,7 @@ function ClienteDetail({ cliente, centrosCusto, onBack, onEditCliente, onDeleteC
             /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-500", children: [cc.codigoPostal, cc.localidade].filter(Boolean).join(" ") })
           ] })
         ] }),
-        /* @__PURE__ */ jsxs("div", { className: "flex gap-1 shrink-0", children: [
+        canManage && /* @__PURE__ */ jsxs("div", { className: "flex gap-1 shrink-0", children: [
           /* @__PURE__ */ jsx(
             "button",
             {
@@ -3265,6 +3342,7 @@ function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avar
         materiais,
         equipamentos,
         maoDeObra,
+        consumiveis,
         logotipo,
         onBack: () => setSection(null),
         onAdd: onAddDiaria,
@@ -3285,6 +3363,7 @@ function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avar
         materiais,
         equipamentos,
         maoDeObra,
+        consumiveis,
         logotipo,
         canManage,
         podeVerCustos,
@@ -4357,7 +4436,7 @@ function IncidenciasSection({ center, diarias, avarias, canManage, isAdmin, onBa
     }) })
   ] });
 }
-function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra, logotipo, canManage, podeVerCustos, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onDuplicate, onDeleteAll, onDeleteSelected }) {
+function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, canManage, podeVerCustos, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onDuplicate, onDeleteAll, onDeleteSelected }) {
   const [query, setQuery] = useState("");
   const [fichaCustoFormula, setFichaCustoFormula] = useState(null);
   const [mostrarListaCustos, setMostrarListaCustos] = useState(false);
@@ -4445,6 +4524,7 @@ function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra,
         materiais,
         equipamentos,
         maoDeObra,
+        consumiveis,
         logotipo,
         onOpenFormula: (f) => {
           setMostrarListaCustos(false);
@@ -4534,10 +4614,10 @@ function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra,
         ] })
       ] }, f.id))
     ] }),
-    fichaCustoFormula && /* @__PURE__ */ jsx(FichaCustoModal, { formula: fichaCustoFormula, center, materiais: materiais || [], equipamentos: equipamentos || [], maoDeObra: maoDeObra || [], logotipo, onClose: () => setFichaCustoFormula(null) })
+    fichaCustoFormula && /* @__PURE__ */ jsx(FichaCustoModal, { formula: fichaCustoFormula, center, materiais: materiais || [], equipamentos: equipamentos || [], maoDeObra: maoDeObra || [], consumiveis: consumiveis || [], logotipo, onClose: () => setFichaCustoFormula(null) })
   ] });
 }
-function ExportarProducaoMensalModal({ center, diarias, clientes, centrosCusto, formulas, materiais, equipamentos, maoDeObra, logotipo, onClose }) {
+function ExportarProducaoMensalModal({ center, diarias, clientes, centrosCusto, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, onClose }) {
   const [mesAno, setMesAno] = useState((/* @__PURE__ */ new Date()).toISOString().slice(0, 7));
   const [clienteId, setClienteId] = useState("");
   const nomeCliente = (id) => clientes.find((c) => c.id === id)?.designacao || "\u2014";
@@ -4553,7 +4633,7 @@ function ExportarProducaoMensalModal({ center, diarias, clientes, centrosCusto, 
     const toneladas = parseFloat(l.toneladas) || 0;
     const misturaLabel = formula?.codigo ? `${formula.codigo} - ${l.artigoDesignacao || formula.designacao || ""}` : l.artigoDesignacao || "\u2014";
     if (!formula) return { ...l, toneladas, misturaLabel, custoUnitario: null, custoTotal: null, semFormula: true };
-    const { totalGeral } = calcularCustoFormula(formula, center, materiais || [], equipamentos || [], maoDeObra || [], l.data);
+    const { totalGeral } = calcularCustoFormula(formula, center, materiais || [], equipamentos || [], maoDeObra || [], l.data, consumiveis || []);
     return { ...l, toneladas, misturaLabel, custoUnitario: totalGeral, custoTotal: totalGeral * toneladas };
   }).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
   const totalToneladas = linhasComCusto.reduce((s, l) => s + l.toneladas, 0);
@@ -4761,7 +4841,7 @@ function GraficoProducaoModal({ diarias, center, onClose }) {
     ] })
   ] });
 }
-function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, canManage, podeRegistar, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onOpenDiaria, onOpenResolucao, formulas, materiais, equipamentos, maoDeObra, logotipo }) {
+function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, canManage, podeRegistar, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onOpenDiaria, onOpenResolucao, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo }) {
   const [searchDate, setSearchDate] = useState("");
   const [mostrarGrafico, setMostrarGrafico] = useState(false);
   const [mostrarExportarMensal, setMostrarExportarMensal] = useState(false);
@@ -4793,9 +4873,9 @@ function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, can
     if (isNaN(tFim)) return tIni;
     return (tIni + tFim) / 2;
   };
-  const mesAtual = (/* @__PURE__ */ new Date()).toISOString().slice(0, 7);
+  const ULTIMAS = 30;
   const todasOrdenadas = [...diarias].sort((a, b) => dataOrdenacaoDiaria(b) - dataOrdenacaoDiaria(a));
-  const sorted = searchDate ? todasOrdenadas.filter((d) => d.dataInicio === searchDate) : todasOrdenadas.filter((d) => (d.dataInicio || "").slice(0, 7) === mesAtual);
+  const sorted = searchDate ? todasOrdenadas.filter((d) => d.dataInicio === searchDate) : todasOrdenadas.slice(0, ULTIMAS);
   return /* @__PURE__ */ jsxs("div", { className: "p-8 max-w-5xl", children: [
     /* @__PURE__ */ jsxs("button", { onClick: onBack, className: "flex items-center gap-1 text-sm text-stone-500 hover:text-amber-600 mb-6 font-medium", children: [
       /* @__PURE__ */ jsx(ChevronLeft, { size: 16 }),
@@ -4897,6 +4977,7 @@ function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, can
         materiais,
         equipamentos,
         maoDeObra,
+        consumiveis,
         logotipo,
         onClose: () => setMostrarExportarMensal(false)
       }
@@ -4916,12 +4997,12 @@ function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, can
         searchDate && /* @__PURE__ */ jsx("button", { onClick: () => setSearchDate(""), className: "absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600", children: /* @__PURE__ */ jsx(X, { size: 15 }) })
       ] }),
       !searchDate && /* @__PURE__ */ jsxs("span", { className: "text-xs text-stone-400", children: [
-        "A mostrar ",
+        "A mostrar as \xFAltimas ",
         sorted.length,
         " di\xE1ria",
         sorted.length !== 1 ? "s" : "",
         " de ",
-        (/* @__PURE__ */ new Date(`${mesAtual}-01T00:00:00Z`)).toLocaleDateString("pt-PT", { month: "long", year: "numeric", timeZone: "UTC" })
+        todasOrdenadas.length
       ] })
     ] }),
     todasOrdenadas.length === 0 ? /* @__PURE__ */ jsxs("div", { className: "bg-white border border-dashed border-stone-300 rounded-xl p-10 text-center", children: [
@@ -5559,7 +5640,7 @@ function DopConfigModal({ dopConfig, onSave, onClose }) {
     /* @__PURE__ */ jsx("button", { onClick: submit, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700", children: "Guardar" })
   ] });
 }
-function UserModal({ data, centers, isAdmin, currentUserRole, onSave, onResetPin, onSetPin, onClose }) {
+function UserModal({ data, centers, isAdmin, currentUserRole, perfisPersonalizados, onSave, onResetPin, onSetPin, onClose }) {
   const [nome, setNome] = useState(data?.nome || "");
   const [primeiroNome, setPrimeiroNome] = useState(data?.primeiroNome || "");
   const [ultimoNome, setUltimoNome] = useState(data?.ultimoNome || "");
@@ -5662,7 +5743,10 @@ function UserModal({ data, centers, isAdmin, currentUserRole, onSave, onResetPin
         ] }),
         assinatura && /* @__PURE__ */ jsx("button", { type: "button", onClick: () => setAssinatura(""), className: "text-xs text-red-600 hover:text-red-700 mt-1", children: "Remover assinatura" })
       ] }),
-      /* @__PURE__ */ jsx(Field, { label: "Perfil", children: /* @__PURE__ */ jsx("select", { value: role, onChange: (e) => setRole(e.target.value), disabled: !isAdmin, className: `${inputCls} disabled:bg-stone-100`, children: ROLES.map((r) => /* @__PURE__ */ jsx("option", { value: r, children: r }, r)) }) }),
+      /* @__PURE__ */ jsx(Field, { label: "Perfil", children: /* @__PURE__ */ jsxs("select", { value: role, onChange: (e) => setRole(e.target.value), disabled: !isAdmin, className: `${inputCls} disabled:bg-stone-100`, children: [
+        ROLES.map((r) => /* @__PURE__ */ jsx("option", { value: r, children: r }, r)),
+        (perfisPersonalizados || []).map((p) => /* @__PURE__ */ jsx("option", { value: p.nome, children: p.nome }, p.id))
+      ] }) }),
       /* @__PURE__ */ jsxs("p", { className: "text-xs text-stone-500 -mt-2 mb-4", children: [
         roleHint[role],
         !isAdmin && " S\xF3 o Administrador pode alterar o papel."
@@ -7266,7 +7350,7 @@ function DiariaModal({ data, artigos, clientes, centrosCusto, diarias, avarias, 
     !readOnly && /* @__PURE__ */ jsx("button", { onClick: submit, disabled: dataFimInvalida, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed", children: "Guardar" })
   ] });
 }
-const calcularCustoFormula = (formula, center, materiais, equipamentos, maoDeObra, dataRef) => {
+const calcularCustoFormula = (formula, center, materiais, equipamentos, maoDeObra, dataRef, consumiveis) => {
   const anoRef = new Date(dataRef).getFullYear();
   const nomeMaterial = (id) => materiais.find((m) => m.id === id)?.designacao || "\u2014";
   const kgNaoAgregadoPorTonelada = TRABALHO_MATERIAL_KEYS.reduce((s, key) => s + (parseFloat(formula.trabalho?.[key]?.design) || 0), 0);
@@ -7307,6 +7391,32 @@ const calcularCustoFormula = (formula, center, materiais, equipamentos, maoDeObr
   });
   const totalDiretos = linhasDiretos.reduce((s, l) => s + (l.custo || 0), 0);
   const temSemPreco = linhasDiretos.some((l) => l.precoUnitario === null);
+  const custoCombustao = (blocoKey, nomeBase) => {
+    const bloco = center.parametrizacao?.[blocoKey] || {};
+    if (!bloco.combustivelId) return null;
+    const combustivelObj = (consumiveis || []).find((c) => c.id === bloco.combustivelId);
+    if (!combustivelObj) return null;
+    const consumoEntry = taxaVigenteEmData(bloco.historico, dataRef);
+    const consumo = consumoEntry ? parseFloat(consumoEntry.valor) : null;
+    const precoEntry = precoVigente(combustivelObj, dataRef);
+    const precoUnitario = precoEntry ? calcularPrecoFinal(precoEntry) : null;
+    const unidadeConsumo = combustivelObj.unidadeCusto || "";
+    let custoPorTonelada = null;
+    let aviso = null;
+    if (consumo === null) {
+      aviso = "Sem consumo definido para esta data.";
+    } else if (precoUnitario === null) {
+      aviso = "Sem pre\xE7o em vigor nesta data para o combust\xEDvel selecionado.";
+    } else {
+      custoPorTonelada = consumo * precoUnitario;
+    }
+    return { key: blocoKey, nome: `${nomeBase} (${combustivelObj.designacao})`, consumo, unidadeConsumo, precoUnitario, custoPorTonelada, aviso };
+  };
+  const linhasCombustao = [
+    custoCombustao("blocoTermico", "Bloco T\xE9rmico"),
+    custoCombustao("queimadorTamborSecador", "Queimador Tambor Secador")
+  ].filter(Boolean);
+  const totalCombustao = linhasCombustao.reduce((s, l) => s + (l.custoPorTonelada || 0), 0);
   const producaoAnualHistorico = center.parametrizacao?.producaoAnualHistorico || [];
   const producaoDoAno = (() => {
     const doAno = producaoAnualHistorico.filter((h) => h.ano === anoRef);
@@ -7417,13 +7527,15 @@ const calcularCustoFormula = (formula, center, materiais, equipamentos, maoDeObr
     return { key: item.id, nome: artigo.designacao, quantidade, valorUnitario, unidade, custoAnual, custoPorTonelada, aviso };
   }).filter(Boolean);
   const totalMaoDeObra = linhasMaoDeObra.reduce((s, l) => s + (l.custoPorTonelada || 0), 0);
-  const totalGeral = totalDiretos + totalEquipamento + totalMaoDeObra + totalFixos + totalVariaveis;
+  const totalGeral = totalDiretos + totalCombustao + totalEquipamento + totalMaoDeObra + totalFixos + totalVariaveis;
   return {
     anoRef,
     producaoDoAno,
     linhasDiretos,
     totalDiretos,
     temSemPreco,
+    linhasCombustao,
+    totalCombustao,
     linhasEquipamento,
     totalEquipamento,
     linhasFixos,
@@ -7435,13 +7547,13 @@ const calcularCustoFormula = (formula, center, materiais, equipamentos, maoDeObr
     totalGeral
   };
 };
-function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, maoDeObra, logotipo, onOpenFormula, onClose }) {
+function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, onOpenFormula, onClose }) {
   const [dataRef, setDataRef] = useState((/* @__PURE__ */ new Date()).toISOString().slice(0, 10));
   const [fatorK, setFatorK] = useState("1");
   const [exportarQue, setExportarQue] = useState("tudo");
   const k = parseFloat(fatorK) || 1;
   const linhas = [...formulas].sort((a, b) => (a.codigo || "").localeCompare(b.codigo || "", "pt", { numeric: true, sensitivity: "base" })).map((f) => {
-    const { totalGeral } = calcularCustoFormula(f, center, materiais, equipamentos, maoDeObra, dataRef);
+    const { totalGeral } = calcularCustoFormula(f, center, materiais, equipamentos, maoDeObra, dataRef, consumiveis);
     return { id: f.id, codigo: f.codigo, designacao: f.designacao, custo: totalGeral, venda: totalGeral * k };
   });
   const exportar = () => {
@@ -7541,7 +7653,7 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
     ] }) })
   ] });
 }
-function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, logotipo, onClose }) {
+function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, consumiveis, logotipo, onClose }) {
   const [dataRef, setDataRef] = useState((/* @__PURE__ */ new Date()).toISOString().slice(0, 10));
   const [fatorK, setFatorK] = useState("1");
   const {
@@ -7549,6 +7661,8 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
     linhasDiretos,
     totalDiretos,
     temSemPreco,
+    linhasCombustao,
+    totalCombustao,
     linhasEquipamento,
     totalEquipamento,
     linhasFixos,
@@ -7558,7 +7672,7 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
     linhasMaoDeObra,
     totalMaoDeObra,
     totalGeral
-  } = calcularCustoFormula(formula, center, materiais, equipamentos, maoDeObra, dataRef);
+  } = calcularCustoFormula(formula, center, materiais, equipamentos, maoDeObra, dataRef, consumiveis);
   const k = parseFloat(fatorK) || 1;
   const totalComFatorK = totalGeral * k;
   const exportarFichaCusto = () => {
@@ -7571,6 +7685,7 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
         <td style="text-align:right">${l.precoUnitario !== null ? l.precoUnitario.toLocaleString("pt-PT", { maximumFractionDigits: 3 }) + " \u20AC" : "sem pre\xE7o"}</td>
         <td style="text-align:right; font-weight:bold">${l.custo !== null ? l.custo.toLocaleString("pt-PT", { maximumFractionDigits: 2 }) + " \u20AC" : "\u2014"}</td>
       </tr>`).join("");
+    const tabelaCombustao = linhasCombustao.map((l) => linhaHtml(l.nome, l.consumo !== null ? `${l.consumo.toLocaleString("pt-PT", { maximumFractionDigits: 3 })} ${l.unidadeConsumo}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
     const tabelaEquip = linhasEquipamento.map((l) => linhaHtml(l.nome, l.valor !== null ? `${l.valor.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
     const tabelaMaoObra = linhasMaoDeObra.map((l) => linhaHtml(`${l.nome} (qtd. ${l.quantidade ?? "\u2014"})`, l.valorUnitario !== null ? `${l.valorUnitario.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
     const tabelaFixos = linhasFixos.map((l) => linhaHtml(l.nome, `${l.valor.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/ano`, l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
@@ -7604,28 +7719,35 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
         </table>
         <p class="subtotal">Subtotal Diretos: ${totalDiretos.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t</p>
 
-        <h2>2 \u2014 Custo Equipamento</h2>
+        <h2>2 \u2014 Bloco T\xE9rmico e Queimador Tambor Secador</h2>
+        <table>
+          <tr><th>Origem</th><th style="text-align:right">Consumo</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
+          ${tabelaCombustao || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
+        </table>
+        <p class="subtotal">Subtotal Bloco T\xE9rmico/Queimador: ${totalCombustao.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t</p>
+
+        <h2>3 \u2014 Custo Equipamento</h2>
         <table>
           <tr><th>Equipamento</th><th style="text-align:right">Valor</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
           ${tabelaEquip || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
         </table>
         <p class="subtotal">Subtotal Equipamento: ${totalEquipamento.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t</p>
 
-        <h2>3 \u2014 M\xE3o de Obra</h2>
+        <h2>4 \u2014 M\xE3o de Obra</h2>
         <table>
           <tr><th>Categoria</th><th style="text-align:right">Valor</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
           ${tabelaMaoObra || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
         </table>
         <p class="subtotal">Subtotal M\xE3o de Obra: ${totalMaoDeObra.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t</p>
 
-        <h2>4 \u2014 Custos Fixos</h2>
+        <h2>5 \u2014 Custos Fixos</h2>
         <table>
           <tr><th>Custo</th><th style="text-align:right">Valor Anual</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
           ${tabelaFixos || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
         </table>
         <p class="subtotal">Subtotal Custos Fixos: ${totalFixos.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t</p>
 
-        <h2>5 \u2014 Custos Vari\xE1veis</h2>
+        <h2>6 \u2014 Custos Vari\xE1veis</h2>
         <table>
           <tr><th>Custo</th><th style="text-align:right">Valor</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
           ${tabelaVariaveis || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
@@ -7682,7 +7804,31 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
         " \u20AC / t"
       ] })
     ] }),
-    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "2 \u2014 Custo Equipamento" }),
+    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "2 \u2014 Bloco T\xE9rmico e Queimador Tambor Secador" }),
+    /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 mb-2", children: "Consumo de combust\xEDvel em vigor nesta data (definido em Parametriza\xE7\xE3o de Produ\xE7\xE3o) \xD7 pre\xE7o em vigor do combust\xEDvel selecionado." }),
+    linhasCombustao.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-sm text-stone-400 py-4", children: "Ainda n\xE3o h\xE1 combust\xEDvel selecionado para o Bloco T\xE9rmico ou o Queimador Tambor Secador (configure em Parametriza\xE7\xE3o de Produ\xE7\xE3o)." }) : /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-hidden mb-2", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
+      /* @__PURE__ */ jsx("thead", { className: "bg-stone-100", children: /* @__PURE__ */ jsxs("tr", { children: [
+        /* @__PURE__ */ jsx("th", { className: "text-left px-3 py-2 text-xs font-semibold uppercase tracking-wide text-stone-500", children: "Origem" }),
+        /* @__PURE__ */ jsx("th", { className: "text-right px-3 py-2 text-xs font-semibold uppercase tracking-wide text-stone-500", children: "Consumo" }),
+        /* @__PURE__ */ jsx("th", { className: "text-right px-3 py-2 text-xs font-semibold uppercase tracking-wide text-stone-500", children: "Custo (\u20AC/t)" })
+      ] }) }),
+      /* @__PURE__ */ jsx("tbody", { children: linhasCombustao.map((l, i) => /* @__PURE__ */ jsxs("tr", { className: i !== linhasCombustao.length - 1 ? "border-b border-stone-100" : "", children: [
+        /* @__PURE__ */ jsxs("td", { className: "px-3 py-2 text-stone-800", children: [
+          l.nome,
+          l.aviso && /* @__PURE__ */ jsx("span", { className: "block text-[11px] text-amber-600 mt-0.5", children: l.aviso })
+        ] }),
+        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data", children: l.consumo !== null ? `${l.consumo.toLocaleString("pt-PT", { maximumFractionDigits: 3 })} ${l.unidadeConsumo}` : "\u2014" }),
+        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
+      ] }, l.key)) })
+    ] }) }),
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-stone-100 rounded-lg px-4 py-2.5 mb-5", children: [
+      /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-stone-700", children: "Subtotal Bloco T\xE9rmico/Queimador" }),
+      /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-stone-800", children: [
+        totalCombustao.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+        " \u20AC / t"
+      ] })
+    ] }),
+    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "3 \u2014 Custo Equipamento" }),
     /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 mb-2", children: "P\xE1 carregadora e outro equipamento vari\xE1vel, mais o aluguer da central \u2014 repartidos pela produ\xE7\xE3o anual estimada para chegar ao \u20AC/tonelada." }),
     linhasEquipamento.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-sm text-stone-400 py-4", children: "Ainda n\xE3o h\xE1 custos de equipamento configurados em Parametriza\xE7\xE3o de Produ\xE7\xE3o." }) : /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-hidden mb-2", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
       /* @__PURE__ */ jsx("thead", { className: "bg-stone-100", children: /* @__PURE__ */ jsxs("tr", { children: [
@@ -7706,7 +7852,7 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
         " \u20AC / t"
       ] })
     ] }),
-    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "3 \u2014 M\xE3o de Obra" }),
+    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "4 \u2014 M\xE3o de Obra" }),
     /* @__PURE__ */ jsxs("p", { className: "text-xs text-stone-400 mb-2", children: [
       DIAS_UTEIS_ANO_PADRAO,
       " dias \xFAteis (m\xE9dia fixa) \xD7 10 h/dia (categorias em \u20AC/hora) ou s\xF3 os dias (categorias em \u20AC/dia) \xD7 valor \xD7 quantidade em vigor nesta data, repartido pela produ\xE7\xE3o anual estimada."
@@ -7735,7 +7881,7 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
         " \u20AC / t"
       ] })
     ] }),
-    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "4 \u2014 Custos Fixos" }),
+    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "5 \u2014 Custos Fixos" }),
     /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 mb-2", children: "Valores globais anuais, repartidos pela Produ\xE7\xE3o Anual Estimada." }),
     linhasFixos.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-sm text-stone-400 py-4", children: "Ainda n\xE3o h\xE1 custos fixos com valor registado para esta data (configure em Parametriza\xE7\xE3o de Produ\xE7\xE3o)." }) : /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-hidden mb-2", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
       /* @__PURE__ */ jsx("thead", { className: "bg-stone-100", children: /* @__PURE__ */ jsxs("tr", { children: [
@@ -7762,7 +7908,7 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
         " \u20AC / t"
       ] })
     ] }),
-    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "5 \u2014 Custos Vari\xE1veis" }),
+    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "6 \u2014 Custos Vari\xE1veis" }),
     /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 mb-2", children: "Controlo Laboratorial j\xE1 em \u20AC/tonelada. O Aluguer da Central passou a fazer parte do Custo de Equipamento." }),
     linhasVariaveis.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-sm text-stone-400 py-4", children: "Ainda n\xE3o h\xE1 custos vari\xE1veis com valor registado para esta data (configure em Parametriza\xE7\xE3o de Produ\xE7\xE3o)." }) : /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-hidden mb-2", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
       /* @__PURE__ */ jsx("thead", { className: "bg-stone-100", children: /* @__PURE__ */ jsxs("tr", { children: [
@@ -9308,7 +9454,7 @@ function EditarPrecoModal({ material, entry, tipo, tiposDesconto, tiposCustoExtr
     /* @__PURE__ */ jsx("button", { onClick: submit, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700", children: "Guardar altera\xE7\xF5es" })
   ] });
 }
-function HistoricoPrecosModal({ material, onDelete, onEdit, onClose }) {
+function HistoricoPrecosModal({ material, isAdmin, onDelete, onEdit, onClose }) {
   const historico = historicoOrdenado(material);
   const emVigorId = precoVigente(material)?.id;
   const descontoTexto = (d) => `${d.tipo === "fixo" ? `${parseFloat(d.valor || 0).toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : `${d.valor || 0}%`} (${d.categoria === "Outro" && d.outroTexto ? d.outroTexto : d.categoria})${d.aplicarNoCalculo === false ? " [n\xE3o entra no c\xE1lculo]" : ""}`;
@@ -9341,10 +9487,10 @@ function HistoricoPrecosModal({ material, onDelete, onEdit, onClose }) {
       /* @__PURE__ */ jsx(Line, { type: "monotone", dataKey: "preco", stroke: "#d97706", strokeWidth: 2.5, dot: { r: 4, fill: "#d97706" }, activeDot: { r: 6 } })
     ] }) }) }),
     /* @__PURE__ */ jsx("div", { className: "space-y-2", children: historico.map((p) => /* @__PURE__ */ jsxs("div", { className: `border rounded-lg p-3 relative ${p.id === emVigorId ? "border-amber-300 bg-amber-50/60" : "border-stone-200"}`, children: [
-      /* @__PURE__ */ jsxs("div", { className: "absolute top-2 right-2 flex gap-1", children: [
+      /* @__PURE__ */ jsx("div", { className: "absolute top-2 right-2 flex gap-1", children: isAdmin && /* @__PURE__ */ jsxs(Fragment, { children: [
         /* @__PURE__ */ jsx("button", { onClick: () => onEdit(material, p), className: "text-stone-400 hover:text-amber-600", children: /* @__PURE__ */ jsx(Pencil, { size: 14 }) }),
         /* @__PURE__ */ jsx("button", { onClick: () => onDelete(material.id, p.id), className: "text-stone-400 hover:text-red-600", children: /* @__PURE__ */ jsx(Trash2, { size: 14 }) })
-      ] }),
+      ] }) }),
       /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 pr-12", children: [
         /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-stone-800", children: [
           calcularPrecoFinal(p).toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
