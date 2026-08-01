@@ -3675,10 +3675,10 @@ function ParametrizacaoSection({ center, canManage, isAdmin, onBack, onOpenAtual
           ["custoEstaleiro", "Aluguer de Estaleiro (\u20AC/ano)"],
           ["custoQAS", "Qualidade/Ambiente/Seguran\xE7a (\u20AC/ano)"],
           ["custoAmortizacao", "Amortiza\xE7\xE3o da Central (\u20AC/ano)"],
-          ["custoAluguerCentral", "Aluguer da Central (\u20AC/ano)"],
           ["custoMudancaCentral", "Mudan\xE7a de Central (\u20AC/ano)"],
           ["custoManutencaoCentral", "Manuten\xE7\xE3o da Central (\u20AC/ano)"],
-          ["custoControloLab", "Controlo Laboratorial (\u20AC/t)"]
+          ["custoControloLab", "Controlo Laboratorial (\u20AC/t)"],
+          ["custoAluguerCentral", "Aluguer da Central (\u20AC/t)"]
         ].forEach(([key, nome]) => {
           (center.parametrizacao?.[key]?.historico || []).forEach((h) => linhas.push([nome, h.dataEntradaVigor || "", h.valor ?? "", ""]));
         });
@@ -3968,9 +3968,9 @@ function ParametrizacaoSection({ center, canManage, isAdmin, onBack, onOpenAtual
         {
           center,
           blocoKey: "custoAluguerCentral",
-          titulo: "Aluguer da Central (\u20AC)",
-          descricao: "Valor global anual de aluguer da central (alternativa \xE0 amortiza\xE7\xE3o, se a central for alugada).",
-          unidade: "\u20AC",
+          titulo: "Aluguer da Central (\u20AC/tonelada)",
+          descricao: "Custo por tonelada produzida de aluguer da central (alternativa \xE0 amortiza\xE7\xE3o, se a central for alugada).",
+          unidade: "\u20AC/t",
           isAdmin,
           onOpenAtualizarTaxa,
           onOpenHistoricoTaxa,
@@ -7476,8 +7476,6 @@ const calcularCustoFormula = (formula, center, materiais, equipamentos, maoDeObr
     }
     linhasEquipamento.push({ key: item.id, nome: equipamentoObj.designacao, valor, unidade, custoPorTonelada, aviso });
   });
-  const linhaAluguer = converterAnualParaTonelada("custoAluguerCentral", "Aluguer da Central");
-  if (linhaAluguer) linhasEquipamento.push(linhaAluguer);
   const totalEquipamento = linhasEquipamento.reduce((s, l) => s + (l.custoPorTonelada || 0), 0);
   const linhasFixos = [
     converterAnualParaTonelada("custoCertificacao", "Certifica\xE7\xE3o"),
@@ -7494,6 +7492,12 @@ const calcularCustoFormula = (formula, center, materiais, equipamentos, maoDeObr
   if (taxaControloLab) {
     const valor = parseFloat(taxaControloLab.valor) || 0;
     linhasVariaveis.push({ key: "custoControloLab", nome: "Controlo Laboratorial", valor, unidade: "\u20AC/t", custoPorTonelada: valor, aviso: null });
+  }
+  const blocoAluguerCentral = center.parametrizacao?.custoAluguerCentral || {};
+  const taxaAluguerCentral = taxaVigenteEmData(blocoAluguerCentral.historico, dataRef);
+  if (taxaAluguerCentral) {
+    const valor = parseFloat(taxaAluguerCentral.valor) || 0;
+    linhasVariaveis.push({ key: "custoAluguerCentral", nome: "Aluguer da Central", valor, unidade: "\u20AC/t", custoPorTonelada: valor, aviso: null });
   }
   const totalVariaveis = linhasVariaveis.reduce((s, l) => s + (l.custoPorTonelada || 0), 0);
   const HORAS_POR_DIA = 10;
@@ -7829,7 +7833,7 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
       ] })
     ] }),
     /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "3 \u2014 Custo Equipamento" }),
-    /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 mb-2", children: "P\xE1 carregadora e outro equipamento vari\xE1vel, mais o aluguer da central \u2014 repartidos pela produ\xE7\xE3o anual estimada para chegar ao \u20AC/tonelada." }),
+    /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 mb-2", children: "P\xE1 carregadora e outro equipamento vari\xE1vel \u2014 repartidos pela produ\xE7\xE3o anual estimada para chegar ao \u20AC/tonelada." }),
     linhasEquipamento.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-sm text-stone-400 py-4", children: "Ainda n\xE3o h\xE1 custos de equipamento configurados em Parametriza\xE7\xE3o de Produ\xE7\xE3o." }) : /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-hidden mb-2", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
       /* @__PURE__ */ jsx("thead", { className: "bg-stone-100", children: /* @__PURE__ */ jsxs("tr", { children: [
         /* @__PURE__ */ jsx("th", { className: "text-left px-3 py-2 text-xs font-semibold uppercase tracking-wide text-stone-500", children: "Item" }),
@@ -7909,7 +7913,7 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
       ] })
     ] }),
     /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "6 \u2014 Custos Vari\xE1veis" }),
-    /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 mb-2", children: "Controlo Laboratorial j\xE1 em \u20AC/tonelada. O Aluguer da Central passou a fazer parte do Custo de Equipamento." }),
+    /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 mb-2", children: "Controlo Laboratorial e Aluguer da Central j\xE1 em \u20AC/tonelada \u2014 aplicados diretamente, sem passar pela Produ\xE7\xE3o Anual Estimada." }),
     linhasVariaveis.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-sm text-stone-400 py-4", children: "Ainda n\xE3o h\xE1 custos vari\xE1veis com valor registado para esta data (configure em Parametriza\xE7\xE3o de Produ\xE7\xE3o)." }) : /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-hidden mb-2", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
       /* @__PURE__ */ jsx("thead", { className: "bg-stone-100", children: /* @__PURE__ */ jsxs("tr", { children: [
         /* @__PURE__ */ jsx("th", { className: "text-left px-3 py-2 text-xs font-semibold uppercase tracking-wide text-stone-500", children: "Custo" }),
