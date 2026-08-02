@@ -8410,7 +8410,7 @@ function FormulaModal({ data, readOnly, isAdmin, materiaisDisponiveis, tiposMate
         !silosOk && " (tem de somar 100%)"
       ] })
     ] }),
-    /* @__PURE__ */ jsx("div", { className: "border-2 border-amber-200 bg-amber-50/40 rounded-lg overflow-hidden mb-4 divide-y divide-amber-200", children: SILO_COLS.map((c) => {
+    /* @__PURE__ */ jsx("div", { className: "border-2 border-amber-200 bg-amber-50/40 rounded-lg overflow-visible mb-4 divide-y divide-amber-200", children: SILO_COLS.map((c) => {
       const temMaterial = !!silos[c.key]?.materialId;
       return /* @__PURE__ */ jsxs("div", { className: `flex items-center gap-3 px-3 py-2 ${temMaterial ? "bg-white" : "bg-amber-50/60"}`, children: [
         /* @__PURE__ */ jsx("span", { className: `text-[11px] font-semibold uppercase tracking-wide w-16 shrink-0 ${temMaterial ? "text-stone-500" : "text-stone-400"}`, children: c.label }),
