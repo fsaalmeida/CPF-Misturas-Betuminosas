@@ -7580,7 +7580,7 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
   const k = parseFloat(fatorK) || 1;
   const linhas = [...formulas].filter((f) => f.incluirEmCustosTodas !== false).sort((a, b) => (a.codigo || "").localeCompare(b.codigo || "", "pt", { numeric: true, sensitivity: "base" })).map((f) => {
     const { totalGeral } = calcularCustoFormula(f, center, materiais, equipamentos, maoDeObra, dataRef, consumiveis);
-    return { id: f.id, codigo: f.codigo, designacao: f.designacao, custo: totalGeral, venda: totalGeral * k };
+    return { id: f.id, codigo: f.codigo, designacao: f.designacao, observacoes: f.observacoes || "", custo: totalGeral, venda: totalGeral * k };
   });
   const exportar = () => {
     const mostrarCusto = exportarQue !== "so-venda";
@@ -7592,7 +7592,7 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
     ].join("");
     const linhasHtml = linhas.map((l) => `
       <tr>
-        <td>${l.codigo}</td><td>${l.designacao}</td>
+        <td>${l.codigo}</td><td>${l.designacao}${l.observacoes ? `<br><span style="color:#78716c; font-size:10px;">Obs: ${l.observacoes}</span>` : ""}</td>
         ${mostrarCusto ? `<td style="text-align:right">${l.custo.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC</td>` : ""}
         ${mostrarVenda ? `<td style="text-align:right; font-weight:bold">${l.venda.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC</td>` : ""}
       </tr>`).join("");
@@ -7663,7 +7663,13 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
           className: `cursor-pointer hover:bg-amber-50 ${i !== linhas.length - 1 ? "border-b border-stone-100" : ""}`,
           children: [
             /* @__PURE__ */ jsx("td", { className: "px-3 py-2 font-mono-data text-amber-700 font-semibold", children: l.codigo }),
-            /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-stone-800", children: l.designacao }),
+            /* @__PURE__ */ jsxs("td", { className: "px-3 py-2 text-stone-800", children: [
+              l.designacao,
+              l.observacoes && /* @__PURE__ */ jsxs("span", { className: "block text-xs text-amber-700 font-normal mt-0.5", children: [
+                "Obs: ",
+                l.observacoes
+              ] })
+            ] }),
             /* @__PURE__ */ jsxs("td", { className: "px-3 py-2 text-right font-mono-data text-stone-600", children: [
               l.custo.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
               " \u20AC"
