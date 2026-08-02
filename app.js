@@ -7601,10 +7601,11 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
     const alturaCabecalho = 18;
     if (logotipo) {
       try {
-        const img = new Image();
-        img.src = logotipo;
-        const proporcao = img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 3;
-        doc.addImage(logotipo, margemEsq, y, alturaCabecalho * proporcao, alturaCabecalho);
+        const formatoMatch = /^data:image\/(\w+);/.exec(logotipo);
+        const formato = formatoMatch ? formatoMatch[1].toUpperCase().replace("JPG", "JPEG") : "PNG";
+        const propsImg = doc.getImageProperties(logotipo);
+        const proporcao = propsImg.width && propsImg.height ? propsImg.width / propsImg.height : 3;
+        doc.addImage(logotipo, formato, margemEsq, y, alturaCabecalho * proporcao, alturaCabecalho);
       } catch {
       }
     }
