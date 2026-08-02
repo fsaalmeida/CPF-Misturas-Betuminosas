@@ -1,6 +1,8 @@
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ComposedChart, Bar, Legend } from "recharts";
 import { ShieldCheck, Wrench, HardHat, Plus, Pencil, Trash2, ChevronLeft, LogOut, Factory, Users, X, MapPin, Beaker, Power, PowerOff, Upload, FileSpreadsheet, CheckCircle2, ClipboardList, Mountain, Droplet, PackagePlus, Box, ChevronRight, Construction, Building2, FlaskConical, Search, ArrowUpDown, AlertTriangle, Calculator, Eye, Package, TrendingUp, History, Truck, Copy, Grid3x3, Settings, Fuel, Archive, FileText, Image } from "lucide-react";
 const ROLES = ["Administrador", "Gestor", "Operador", "Or\xE7amentista", "Convidado"];
@@ -7587,59 +7589,74 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
   const exportar = () => {
     const mostrarCusto = exportarQue !== "so-venda";
     const mostrarVenda = exportarQue !== "so-custo";
-    const colunas = [
-      "<th>C\xF3digo</th><th>Designa\xE7\xE3o</th>",
-      mostrarCusto ? '<th style="text-align:right">Custo<br><span style="font-weight:normal">\u20AC/t</span></th>' : "",
-      mostrarVenda ? '<th style="text-align:right">Venda<br><span style="font-weight:normal">\u20AC/t</span></th>' : ""
-    ].join("");
-    const linhasHtml = linhas.map((l) => `
-      <tr>
-        <td>${l.codigo}</td><td>${l.designacao}${l.observacoes ? `<br><span style="color:#78716c; font-size:10px;">Obs: ${l.observacoes}</span>` : ""}</td>
-        ${mostrarCusto ? `<td style="text-align:right">${l.custo.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC</td>` : ""}
-        ${mostrarVenda ? `<td style="text-align:right; font-weight:bold">${l.venda.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC</td>` : ""}
-      </tr>`).join("");
-    const numColunas = 2 + (mostrarCusto ? 1 : 0) + (mostrarVenda ? 1 : 0);
     const agora = /* @__PURE__ */ new Date();
-    const html = `<!DOCTYPE html>
-      <html><head><meta charset="utf-8"><title>Custos das F\xF3rmulas \u2014 ${center?.nome || ""}</title>
-      <style>
-        @page { size: A4 portrait; margin: 18mm 15mm 22mm 15mm;
-          @bottom-left { content: "Exportado em ${formatDatePT(agora.toISOString())} \xE0s ${agora.toTimeString().slice(0, 5)} por ${nomeUtilizadorAtual || "\u2014"}"; font-size: 8px; color: #a8a29e; font-family: Arial, sans-serif; }
-          @bottom-right { content: "P\xE1gina " counter(page) " de " counter(pages); font-size: 8px; color: #a8a29e; font-family: Arial, sans-serif; }
+    const rodapeTexto = `Exportado em ${formatDatePT(agora.toISOString())} \xE0s ${agora.toTimeString().slice(0, 5)} por ${nomeUtilizadorAtual || "\u2014"}`;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const margemEsq = 15;
+    let y = 15;
+    if (logotipo) {
+      try {
+        const img = new Image();
+        img.src = logotipo;
+        const proporcao = img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 3;
+        const alturaLogo = 14;
+        doc.addImage(logotipo, margemEsq, y, alturaLogo * proporcao, alturaLogo);
+        y += alturaLogo + 4;
+      } catch {
+      }
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.setTextColor(28, 25, 23);
+    doc.text("Custo Final das Misturas", margemEsq, y);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(120, 113, 108);
+    doc.text(`${(center?.nome || "").toUpperCase()} \u2014 \xC0 DATA: ${formatDatePT(dataRef).toUpperCase()}${mostrarVenda ? ` \xB7 FATOR K: ${k.toLocaleString("pt-PT", { maximumFractionDigits: 2 })}` : ""}`, margemEsq, y);
+    const head = [["C\xF3digo", "Designa\xE7\xE3o", ...mostrarCusto ? ["Custo (\u20AC/t)"] : [], ...mostrarVenda ? ["Venda (\u20AC/t)"] : []]];
+    const body = linhas.map((l) => [
+      l.codigo || "",
+      l.designacao + (l.observacoes ? `
+Obs: ${l.observacoes}` : ""),
+      ...mostrarCusto ? [l.custo.toLocaleString("pt-PT", { maximumFractionDigits: 2 }) + " \u20AC"] : [],
+      ...mostrarVenda ? [l.venda.toLocaleString("pt-PT", { maximumFractionDigits: 2 }) + " \u20AC"] : []
+    ]);
+    autoTable(doc, {
+      head,
+      body,
+      startY: y + 6,
+      margin: { left: margemEsq, right: margemEsq, bottom: 16 },
+      styles: { font: "helvetica", fontSize: 9, cellPadding: 2.2, lineColor: [214, 211, 209], lineWidth: 0.1 },
+      headStyles: { fillColor: [245, 245, 244], textColor: [87, 83, 78], fontStyle: "bold", fontSize: 8 },
+      alternateRowStyles: { fillColor: [250, 250, 249] },
+      columnStyles: Object.fromEntries(
+        [mostrarCusto, mostrarVenda].map((show, i) => show ? [2 + i, { halign: "right" }] : null).filter(Boolean)
+      ),
+      didParseCell: (data) => {
+        if (data.column.index === 1 && data.cell.raw && data.cell.raw.includes("\nObs:")) {
+          data.cell.styles.fontSize = 8;
         }
-        body { font-family: 'Arial Narrow', Arial, sans-serif; color: #1c1917; padding: 0; max-width: 100%; margin: 0; font-size: 13px; }
-        .logo { max-height: 55px; margin-bottom: 16px; }
-        h1 { font-size: 18px; margin-bottom: 2px; }
-        .sub { color: #78716c; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-        th, td { border: 1px solid #d6d3d1; padding: 6px 8px; }
-        th { background: #f5f5f4; text-align: left; font-size: 10px; text-transform: uppercase; }
-        tr { page-break-inside: avoid; }
-        .rodape-tela { display: none; }
-        @media screen {
-          body { padding: 32px; max-width: 900px; margin: 0 auto; }
-          .rodape-tela { display: block; margin-top: 24px; padding-top: 10px; border-top: 1px solid #e7e5e4; font-size: 10px; color: #a8a29e; }
-        }
-      </style></head>
-      <body>
-        ${logotipo ? `<img class="logo" src="${logotipo}" alt="Log\xF3tipo" />` : ""}
-        <h1>Custo Final das Misturas</h1>
-        <p class="sub">${center?.nome || ""} \u2014 \xE0 data: ${formatDatePT(dataRef)}${mostrarVenda ? ` \xB7 Fator K: ${k.toLocaleString("pt-PT", { maximumFractionDigits: 2 })}` : ""}</p>
-        <table>
-          <tr>${colunas}</tr>
-          ${linhasHtml || `<tr><td colspan="${numColunas}" style="text-align:center">\u2014</td></tr>`}
-        </table>
-        <p class="rodape-tela">Exportado em ${formatDatePT(agora.toISOString())} \xE0s ${agora.toTimeString().slice(0, 5)} por ${nomeUtilizadorAtual || "\u2014"} \u2014 este rodap\xE9 com a data, hora, utilizador e n\xFAmero de p\xE1gina aparece impresso ao imprimir ou gravar como PDF.</p>
-      </body></html>`;
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Custos_Formulas_${center?.nome || "centro"}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      },
+      didDrawPage: () => {
+        const pageHeight2 = doc.internal.pageSize.getHeight();
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(168, 162, 158);
+        doc.text(rodapeTexto, margemEsq, pageHeight2 - 8);
+      }
+    });
+    const totalPaginas = doc.internal.getNumberOfPages();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    for (let i = 1; i <= totalPaginas; i++) {
+      doc.setPage(i);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(168, 162, 158);
+      doc.text(`P\xE1gina ${i} de ${totalPaginas}`, pageWidth - margemEsq, pageHeight - 8, { align: "right" });
+    }
+    doc.save(`Custos_Formulas_${center?.nome || "centro"}.pdf`);
   };
   return /* @__PURE__ */ jsxs(Modal, { title: "Custos de Todas as F\xF3rmulas", subtitle: center?.nome || "", onClose, wide: true, children: [
     /* @__PURE__ */ jsxs("div", { className: "flex items-end gap-3 mb-3", children: [
