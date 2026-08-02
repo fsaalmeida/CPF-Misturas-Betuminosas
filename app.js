@@ -8403,32 +8403,32 @@ function FormulaModal({ data, readOnly, isAdmin, materiaisDisponiveis, tiposMate
     ] }),
     /* @__PURE__ */ jsx(Field, { label: "Designa\xE7\xE3o", children: /* @__PURE__ */ jsx("input", { value: designacao, disabled: true, className: `${inputCls} bg-stone-100 text-stone-500`, placeholder: "Vem do artigo escolhido" }) }),
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between mb-1.5 mt-2", children: [
-      /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500", children: "Dosifica\xE7\xE3o de Agregados a Frio" }),
+      /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-amber-700", children: "Dosifica\xE7\xE3o de Agregados a Frio" }),
       /* @__PURE__ */ jsxs("span", { className: `text-xs font-mono-data font-semibold ${silosOk ? "text-emerald-600" : "text-amber-600"}`, children: [
         totalSilosPct.toLocaleString("pt-PT", { maximumFractionDigits: 1 }),
         "%",
         !silosOk && " (tem de somar 100%)"
       ] })
     ] }),
-    /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-visible mb-4", children: /* @__PURE__ */ jsx("div", { className: "grid mb-0", style: { gridTemplateColumns: `repeat(${SILO_COLS.length}, minmax(0,1fr))` }, children: SILO_COLS.map((c, idx) => {
+    /* @__PURE__ */ jsx("div", { className: "border-2 border-amber-200 bg-amber-50/40 rounded-lg overflow-hidden mb-4 divide-y divide-amber-200", children: SILO_COLS.map((c) => {
       const temMaterial = !!silos[c.key]?.materialId;
-      return /* @__PURE__ */ jsxs("div", { className: `border-l first:border-l-0 p-2 ${temMaterial ? "border-stone-200 bg-stone-50" : "border-stone-200 bg-stone-100"}`, children: [
-        /* @__PURE__ */ jsx("p", { className: `text-[10px] font-semibold uppercase text-center mb-1 ${temMaterial ? "text-stone-500" : "text-stone-400"}`, children: c.label }),
-        /* @__PURE__ */ jsx("div", { className: "mb-1", children: /* @__PURE__ */ jsx(MaterialSearchSelect, { value: silos[c.key]?.materialId || "", materiais: materiaisAgregado, disabled: readOnly, alignRight: idx >= SILO_COLS.length - 2, isAdmin, onChange: (v) => updateSiloMaterial(c.key, v), compact: true }) }),
+      return /* @__PURE__ */ jsxs("div", { className: `flex items-center gap-3 px-3 py-2 ${temMaterial ? "bg-white" : "bg-amber-50/60"}`, children: [
+        /* @__PURE__ */ jsx("span", { className: `text-[11px] font-semibold uppercase tracking-wide w-16 shrink-0 ${temMaterial ? "text-stone-500" : "text-stone-400"}`, children: c.label }),
+        /* @__PURE__ */ jsx("div", { className: "flex-1 min-w-0", children: /* @__PURE__ */ jsx(MaterialSearchSelect, { value: silos[c.key]?.materialId || "", materiais: materiaisAgregado, disabled: readOnly, isAdmin, onChange: (v) => updateSiloMaterial(c.key, v), compact: true, semAbreviar: true }) }),
         /* @__PURE__ */ jsx(
           "input",
           {
             value: silos[c.key]?.pct || "",
             onChange: (e) => updateGrid(setSilos, silos, c.key, "pct", e.target.value),
             disabled: readOnly || !temMaterial,
-            className: `${gridCls} ${!temMaterial ? "text-stone-300" : ""}`,
+            className: `${gridCls} w-20 shrink-0 ${!temMaterial ? "text-stone-300" : ""}`,
             placeholder: temMaterial ? "%" : ""
           }
         )
       ] }, c.key);
-    }) }) }),
+    }) }),
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between mb-1.5", children: [
-      /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500", children: "F\xF3rmula de Trabalho a Quente" }),
+      /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-sky-700", children: "F\xF3rmula de Trabalho a Quente" }),
       /* @__PURE__ */ jsxs("span", { className: `text-xs font-mono-data font-semibold ${trabalhoOk ? "text-emerald-600" : "text-amber-600"}`, children: [
         totalTrabalho.toLocaleString("pt-PT", { maximumFractionDigits: 1 }),
         " kg",
@@ -8436,9 +8436,9 @@ function FormulaModal({ data, readOnly, isAdmin, materiaisDisponiveis, tiposMate
       ] })
     ] }),
     /* @__PURE__ */ jsx("p", { className: "text-[11px] text-stone-400 -mt-1 mb-1.5", children: "As designa\xE7\xF5es destas colunas s\xE3o partilhadas por todas as f\xF3rmulas deste centro \u2014 alterar aqui altera em todas." }),
-    /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-visible mb-4", children: /* @__PURE__ */ jsx("div", { className: "grid", style: { gridTemplateColumns: `repeat(4, minmax(0,1fr))` }, children: TRABALHO_COLS.map((c, idx) => {
+    /* @__PURE__ */ jsx("div", { className: "border-2 border-sky-200 bg-sky-50/40 rounded-lg overflow-visible mb-4", children: /* @__PURE__ */ jsx("div", { className: "grid", style: { gridTemplateColumns: `repeat(4, minmax(0,1fr))` }, children: TRABALHO_COLS.map((c, idx) => {
       const ligadoAMaterial = TRABALHO_MATERIAL_KEYS.includes(c.key);
-      return /* @__PURE__ */ jsxs("div", { className: `border-l border-t border-stone-200 ${idx % 4 === 0 ? "border-l-0" : ""} p-2 bg-stone-50`, children: [
+      return /* @__PURE__ */ jsxs("div", { className: `border-l border-t border-sky-200 ${idx % 4 === 0 ? "border-l-0" : ""} p-2 bg-white`, children: [
         /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-center gap-1 mb-1", children: [
           c.num && /* @__PURE__ */ jsxs("span", { className: "relative inline-flex items-center justify-center w-5 h-5 rounded bg-amber-100 text-amber-700 shrink-0", title: "Malha do crivo: d = dimens\xE3o menor, D = dimens\xE3o maior (ex: 5/15)", children: [
             /* @__PURE__ */ jsx(Grid3x3, { size: 12, strokeWidth: 2.5 }),
@@ -8462,8 +8462,8 @@ function FormulaModal({ data, readOnly, isAdmin, materiaisDisponiveis, tiposMate
         /* @__PURE__ */ jsx("input", { value: trabalho[c.key]?.design || "", onChange: (e) => updateGrid(setTrabalho, trabalho, c.key, "design", e.target.value), disabled: readOnly, className: gridCls, placeholder: "Quantidade" })
       ] }, c.key);
     }) }) }),
-    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1.5", children: "Hist\xF3rico de Altera\xE7\xF5es" }),
-    /* @__PURE__ */ jsx("div", { className: "border border-stone-200 rounded-lg overflow-hidden mb-4 max-h-40 overflow-y-auto", children: historicoOrdenado2.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 px-3 py-2.5", children: "Ainda sem registos de altera\xE7\xE3o." }) : historicoOrdenado2.map((h) => /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between px-3 py-2 text-xs border-b border-stone-100 last:border-b-0", children: [
+    /* @__PURE__ */ jsx("span", { className: "block text-xs font-semibold uppercase tracking-wide text-stone-600 mb-1.5", children: "Hist\xF3rico de Altera\xE7\xF5es" }),
+    /* @__PURE__ */ jsx("div", { className: "border-2 border-stone-300 rounded-lg overflow-hidden mb-4 max-h-40 overflow-y-auto", children: historicoOrdenado2.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 px-3 py-2.5", children: "Ainda sem registos de altera\xE7\xE3o." }) : historicoOrdenado2.map((h) => /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between px-3 py-2 text-xs border-b border-stone-200 last:border-b-0 bg-stone-50/60", children: [
       /* @__PURE__ */ jsxs("span", { className: "text-stone-600", children: [
         formatDateTimePT(h.data),
         " \u2014 ",
