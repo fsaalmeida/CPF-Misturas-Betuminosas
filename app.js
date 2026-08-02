@@ -1108,6 +1108,13 @@ function App() {
       setConfirmDialog(null);
     });
   };
+  const toggleIncluirCustos = (formulaId) => {
+    setFormulas((prev) => {
+      const atualizado = prev.map((f) => f.id === formulaId ? { ...f, incluirEmCustosTodas: f.incluirEmCustosTodas === false ? true : false } : f);
+      persistRaw("formulas", atualizado);
+      return atualizado;
+    });
+  };
   const importFormulas = (centroId, registos) => {
     const hoje = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const novas = registos.map((r) => ({ ...r, id: genId(), centroId, dataAlteracao: r.dataAlteracao || hoje }));
@@ -1955,6 +1962,7 @@ function App() {
           onDuplicateFormula: duplicarFormula,
           onDeleteAllFormulas: (centroId) => deleteFormulas(formulas.filter((f) => f.centroId === centroId).map((f) => f.id)),
           onDeleteSelectedFormulas: deleteFormulas,
+          onToggleIncluirCustos: toggleIncluirCustos,
           onAddAvaria: () => setModal({ type: "avaria", data: { centroId: selectedCenter.id } }),
           onEditAvaria: (a) => setModal({ type: "avaria", data: a }),
           onDeleteAvaria: deleteAvaria,
@@ -3281,7 +3289,7 @@ const CENTER_MENU = [
   { key: "stocks", label: "Stocks", desc: "Stock atual por produto, calculado a partir das rece\xE7\xF5es", icon: Archive, ready: true },
   { key: "parametrizacao", label: "Parametriza\xE7\xE3o de Produ\xE7\xE3o", desc: "Condi\xE7\xF5es e estimativas para o c\xE1lculo de custos", icon: Settings, ready: true }
 ];
-function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avarias, clientes, centrosCusto, canManage, podeRegistar, podeVerCustos, isAdmin, onBack, onEditCenter, onDeleteCenter, onToggleStatus, onAddMixture, onEditMixture, onDeleteMixture, onToggleMixtureStatus, onImport, onOpenEliminarTodosArtigos, onAddProveniencia, onEditProveniencia, onDeleteProveniencia, onToggleProvenienciaStatus, onAddDiaria, onEditDiaria, onDeleteDiaria, onImportDiarias, onAddFormula, onEditFormula, onDeleteFormula, onImportFormulas, onDuplicateFormula, onDeleteAllFormulas, onDeleteSelectedFormulas, onAddAvaria, onEditAvaria, onDeleteAvaria, onOpenDiaria, onOpenResolucao, onEditIncidenciaDiaria, onDeleteIncidenciaDiaria, onOpenAtualizarProducao, onOpenHistoricoProducao, consumiveis, equipamentos, maoDeObra, onUpdateMaoDeObraItens, onUpdateEquipamentosItens, nomeUtilizadorAtual, logotipo, onSetCombustivel, onOpenAtualizarTaxa, onOpenHistoricoTaxa, onSetEnergiaTipo, materiais, tiposMaterial, rececoes, onAddRececao, onEditRececao, onDeleteRececao, ajustesStock, onOpenHistoricoStock }) {
+function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avarias, clientes, centrosCusto, canManage, podeRegistar, podeVerCustos, isAdmin, onBack, onEditCenter, onDeleteCenter, onToggleStatus, onAddMixture, onEditMixture, onDeleteMixture, onToggleMixtureStatus, onImport, onOpenEliminarTodosArtigos, onAddProveniencia, onEditProveniencia, onDeleteProveniencia, onToggleProvenienciaStatus, onAddDiaria, onEditDiaria, onDeleteDiaria, onImportDiarias, onAddFormula, onEditFormula, onDeleteFormula, onImportFormulas, onDuplicateFormula, onDeleteAllFormulas, onDeleteSelectedFormulas, onToggleIncluirCustos, onAddAvaria, onEditAvaria, onDeleteAvaria, onOpenDiaria, onOpenResolucao, onEditIncidenciaDiaria, onDeleteIncidenciaDiaria, onOpenAtualizarProducao, onOpenHistoricoProducao, consumiveis, equipamentos, maoDeObra, onUpdateMaoDeObraItens, onUpdateEquipamentosItens, nomeUtilizadorAtual, logotipo, onSetCombustivel, onOpenAtualizarTaxa, onOpenHistoricoTaxa, onSetEnergiaTipo, materiais, tiposMaterial, rececoes, onAddRececao, onEditRececao, onDeleteRececao, ajustesStock, onOpenHistoricoStock }) {
   const materiaisPorTipo = (materiaisLista, nomeTipo) => {
     const tid = (tiposMaterial || []).find((t) => normalizeHeader(t.nome) === normalizeHeader(nomeTipo))?.id;
     if (!tid) return materiaisLista;
@@ -3375,7 +3383,8 @@ function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avar
         onImport: onImportFormulas,
         onDuplicate: onDuplicateFormula,
         onDeleteAll: onDeleteAllFormulas,
-        onDeleteSelected: onDeleteSelectedFormulas
+        onDeleteSelected: onDeleteSelectedFormulas,
+        onToggleIncluirCustos
       }
     );
   }
@@ -4436,7 +4445,7 @@ function IncidenciasSection({ center, diarias, avarias, canManage, isAdmin, onBa
     }) })
   ] });
 }
-function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, canManage, podeVerCustos, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onDuplicate, onDeleteAll, onDeleteSelected }) {
+function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, canManage, podeVerCustos, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onDuplicate, onDeleteAll, onDeleteSelected, onToggleIncluirCustos }) {
   const [query, setQuery] = useState("");
   const [fichaCustoFormula, setFichaCustoFormula] = useState(null);
   const [mostrarListaCustos, setMostrarListaCustos] = useState(false);
@@ -4557,9 +4566,12 @@ function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra,
         '".'
       ] })
     ] }) : /* @__PURE__ */ jsxs("div", { className: "bg-white rounded-xl border border-stone-200 overflow-hidden", children: [
-      isAdmin && /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 px-5 py-2 border-b border-stone-100 bg-stone-50/60", children: [
-        /* @__PURE__ */ jsx("input", { type: "checkbox", checked: todasVisiveisSelecionadas, onChange: toggleTodas, className: "w-4 h-4 accent-amber-600 cursor-pointer shrink-0" }),
-        /* @__PURE__ */ jsx("span", { className: "text-xs text-stone-500", children: "Selecionar todas as vis\xEDveis" })
+      isAdmin && /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-2 px-5 py-2 border-b border-stone-100 bg-stone-50/60", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx("input", { type: "checkbox", checked: todasVisiveisSelecionadas, onChange: toggleTodas, className: "w-4 h-4 accent-amber-600 cursor-pointer shrink-0" }),
+          /* @__PURE__ */ jsx("span", { className: "text-xs text-stone-500", children: "Selecionar todas as vis\xEDveis" })
+        ] }),
+        /* @__PURE__ */ jsx("span", { className: "text-xs text-stone-400", children: 'A caixa \xE0 direita escolhe se a f\xF3rmula aparece em "Custos de Todas as F\xF3rmulas"' })
       ] }),
       sorted.map((f, i) => /* @__PURE__ */ jsxs("div", { className: `flex items-center justify-between px-5 py-3.5 hover:bg-stone-50 ${i !== sorted.length - 1 ? "border-b border-stone-100" : ""} ${selecionadas.has(f.id) ? "bg-amber-50/50" : ""}`, children: [
         /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3 min-w-0 flex-1", children: [
@@ -4585,6 +4597,16 @@ function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra,
           ] })
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1 shrink-0", children: [
+          isAdmin && /* @__PURE__ */ jsx(
+            "input",
+            {
+              type: "checkbox",
+              checked: f.incluirEmCustosTodas !== false,
+              onChange: () => onToggleIncluirCustos(f.id),
+              title: 'Incluir em "Custos de Todas as F\xF3rmulas"',
+              className: "w-4 h-4 accent-amber-600 cursor-pointer mr-1"
+            }
+          ),
           podeVerCustos && /* @__PURE__ */ jsx(
             "span",
             {
@@ -7556,7 +7578,7 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
   const [fatorK, setFatorK] = useState("1");
   const [exportarQue, setExportarQue] = useState("tudo");
   const k = parseFloat(fatorK) || 1;
-  const linhas = [...formulas].sort((a, b) => (a.codigo || "").localeCompare(b.codigo || "", "pt", { numeric: true, sensitivity: "base" })).map((f) => {
+  const linhas = [...formulas].filter((f) => f.incluirEmCustosTodas !== false).sort((a, b) => (a.codigo || "").localeCompare(b.codigo || "", "pt", { numeric: true, sensitivity: "base" })).map((f) => {
     const { totalGeral } = calcularCustoFormula(f, center, materiais, equipamentos, maoDeObra, dataRef, consumiveis);
     return { id: f.id, codigo: f.codigo, designacao: f.designacao, custo: totalGeral, venda: totalGeral * k };
   });
