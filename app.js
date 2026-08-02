@@ -1936,6 +1936,7 @@ function App() {
           podeRegistar,
           podeVerCustos,
           isAdmin,
+          currentUserRole: currentUser?.role,
           onBack: () => {
             setView("centers");
             setSelectedCenterId(null);
@@ -3291,7 +3292,7 @@ const CENTER_MENU = [
   { key: "stocks", label: "Stocks", desc: "Stock atual por produto, calculado a partir das rece\xE7\xF5es", icon: Archive, ready: true },
   { key: "parametrizacao", label: "Parametriza\xE7\xE3o de Produ\xE7\xE3o", desc: "Condi\xE7\xF5es e estimativas para o c\xE1lculo de custos", icon: Settings, ready: true }
 ];
-function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avarias, clientes, centrosCusto, canManage, podeRegistar, podeVerCustos, isAdmin, onBack, onEditCenter, onDeleteCenter, onToggleStatus, onAddMixture, onEditMixture, onDeleteMixture, onToggleMixtureStatus, onImport, onOpenEliminarTodosArtigos, onAddProveniencia, onEditProveniencia, onDeleteProveniencia, onToggleProvenienciaStatus, onAddDiaria, onEditDiaria, onDeleteDiaria, onImportDiarias, onAddFormula, onEditFormula, onDeleteFormula, onImportFormulas, onDuplicateFormula, onDeleteAllFormulas, onDeleteSelectedFormulas, onToggleIncluirCustos, onAddAvaria, onEditAvaria, onDeleteAvaria, onOpenDiaria, onOpenResolucao, onEditIncidenciaDiaria, onDeleteIncidenciaDiaria, onOpenAtualizarProducao, onOpenHistoricoProducao, consumiveis, equipamentos, maoDeObra, onUpdateMaoDeObraItens, onUpdateEquipamentosItens, nomeUtilizadorAtual, logotipo, onSetCombustivel, onOpenAtualizarTaxa, onOpenHistoricoTaxa, onSetEnergiaTipo, materiais, tiposMaterial, rececoes, onAddRececao, onEditRececao, onDeleteRececao, ajustesStock, onOpenHistoricoStock }) {
+function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avarias, clientes, centrosCusto, canManage, podeRegistar, podeVerCustos, isAdmin, currentUserRole, onBack, onEditCenter, onDeleteCenter, onToggleStatus, onAddMixture, onEditMixture, onDeleteMixture, onToggleMixtureStatus, onImport, onOpenEliminarTodosArtigos, onAddProveniencia, onEditProveniencia, onDeleteProveniencia, onToggleProvenienciaStatus, onAddDiaria, onEditDiaria, onDeleteDiaria, onImportDiarias, onAddFormula, onEditFormula, onDeleteFormula, onImportFormulas, onDuplicateFormula, onDeleteAllFormulas, onDeleteSelectedFormulas, onToggleIncluirCustos, onAddAvaria, onEditAvaria, onDeleteAvaria, onOpenDiaria, onOpenResolucao, onEditIncidenciaDiaria, onDeleteIncidenciaDiaria, onOpenAtualizarProducao, onOpenHistoricoProducao, consumiveis, equipamentos, maoDeObra, onUpdateMaoDeObraItens, onUpdateEquipamentosItens, nomeUtilizadorAtual, logotipo, onSetCombustivel, onOpenAtualizarTaxa, onOpenHistoricoTaxa, onSetEnergiaTipo, materiais, tiposMaterial, rececoes, onAddRececao, onEditRececao, onDeleteRececao, ajustesStock, onOpenHistoricoStock }) {
   const materiaisPorTipo = (materiaisLista, nomeTipo) => {
     const tid = (tiposMaterial || []).find((t) => normalizeHeader(t.nome) === normalizeHeader(nomeTipo))?.id;
     if (!tid) return materiaisLista;
@@ -3378,6 +3379,7 @@ function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avar
         canManage,
         podeVerCustos,
         isAdmin,
+        currentUserRole,
         onBack: () => setSection(null),
         onAdd: onAddFormula,
         onEdit: onEditFormula,
@@ -3552,7 +3554,7 @@ function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avar
       /* @__PURE__ */ jsx("strong", { children: "inativo" }),
       ". Continua vis\xEDvel e consult\xE1vel, mas foi assinalado como fora de opera\xE7\xE3o."
     ] }),
-    /* @__PURE__ */ jsx("div", { className: "grid sm:grid-cols-2 gap-3", children: CENTER_MENU.filter((item) => item.key !== "parametrizacao" || isAdmin).map((item) => {
+    /* @__PURE__ */ jsx("div", { className: "grid sm:grid-cols-2 gap-3", children: CENTER_MENU.filter((item) => (item.key !== "parametrizacao" || isAdmin) && (currentUserRole !== "Or\xE7amentista" || item.key === "formulas")).map((item) => {
       const Icon = item.icon;
       return /* @__PURE__ */ jsxs(
         "button",
@@ -4448,7 +4450,7 @@ function IncidenciasSection({ center, diarias, avarias, canManage, isAdmin, onBa
     }) })
   ] });
 }
-function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, canManage, podeVerCustos, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onDuplicate, onDeleteAll, onDeleteSelected, onToggleIncluirCustos, nomeUtilizadorAtual }) {
+function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, canManage, podeVerCustos, isAdmin, currentUserRole, onBack, onAdd, onEdit, onDelete, onImport, onDuplicate, onDeleteAll, onDeleteSelected, onToggleIncluirCustos, nomeUtilizadorAtual }) {
   const [query, setQuery] = useState("");
   const [fichaCustoFormula, setFichaCustoFormula] = useState(null);
   const [mostrarListaCustos, setMostrarListaCustos] = useState(false);
@@ -4580,7 +4582,25 @@ function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra,
       sorted.map((f, i) => /* @__PURE__ */ jsxs("div", { className: `flex items-center justify-between px-5 py-3.5 hover:bg-stone-50 ${i !== sorted.length - 1 ? "border-b border-stone-100" : ""} ${selecionadas.has(f.id) ? "bg-amber-50/50" : ""}`, children: [
         /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3 min-w-0 flex-1", children: [
           isAdmin && /* @__PURE__ */ jsx("input", { type: "checkbox", checked: selecionadas.has(f.id), onChange: () => toggleUma(f.id), className: "w-4 h-4 accent-amber-600 cursor-pointer shrink-0" }),
-          /* @__PURE__ */ jsxs("button", { onClick: () => onEdit(f), className: "flex items-center gap-3 min-w-0 text-left flex-1", children: [
+          currentUserRole === "Or\xE7amentista" ? /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3 min-w-0 flex-1", children: [
+            /* @__PURE__ */ jsx("span", { className: "font-mono-data text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded shrink-0", children: f.codigo || "\u2014" }),
+            /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
+              /* @__PURE__ */ jsx("p", { className: "font-display font-medium text-stone-900 truncate", children: f.designacao || "\u2014" }),
+              /* @__PURE__ */ jsxs("p", { className: "text-xs text-stone-400", children: [
+                f.estudo && /* @__PURE__ */ jsxs(Fragment, { children: [
+                  "Estudo ",
+                  f.estudo,
+                  " \xB7 "
+                ] }),
+                "Alterado em ",
+                fmtDate(f.dataAlteracao)
+              ] }),
+              f.observacoes && /* @__PURE__ */ jsxs("p", { className: "text-xs text-amber-700 truncate mt-0.5", children: [
+                "Obs: ",
+                f.observacoes
+              ] })
+            ] })
+          ] }) : /* @__PURE__ */ jsxs("button", { onClick: () => onEdit(f), className: "flex items-center gap-3 min-w-0 text-left flex-1", children: [
             /* @__PURE__ */ jsx("span", { className: "font-mono-data text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded shrink-0", children: f.codigo || "\u2014" }),
             /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
               /* @__PURE__ */ jsx("p", { className: "font-display font-medium text-stone-900 truncate", children: f.designacao || "\u2014" }),
