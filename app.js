@@ -7639,7 +7639,7 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
     doc.setTextColor(87, 83, 78);
     doc.text(nomeCentral, pageWidthTopo - margemDir, y + 9.5, { align: "right" });
     doc.setTextColor(120, 113, 108);
-    doc.text(`Data: ${formatDatePT(dataRef)}${mostrarVenda ? ` \xB7 Fator K: ${k.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""}`, pageWidthTopo - margemDir, y + 14.5, { align: "right" });
+    doc.text(`Data: ${formatDatePT(dataRef)}${mostrarVenda && exportarQue !== "so-venda" ? ` \xB7 Fator K: ${k.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""}`, pageWidthTopo - margemDir, y + 14.5, { align: "right" });
     y += alturaCabecalho + 3;
     doc.setDrawColor(214, 211, 209);
     doc.setLineWidth(0.2);
