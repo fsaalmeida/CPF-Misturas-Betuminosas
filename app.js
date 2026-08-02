@@ -1049,7 +1049,7 @@ function App() {
     setModal(null);
   };
   const formulaChanged = (original, novo) => {
-    const camposSimples = ["codigo", "estudo", "dataEstudo", "designacao", "central"];
+    const camposSimples = ["codigo", "estudo", "dataEstudo", "designacao", "central", "observacoes"];
     if (camposSimples.some((k) => String(original?.[k] || "") !== String(novo?.[k] || ""))) return true;
     if (JSON.stringify(original?.silos || {}) !== JSON.stringify(novo?.silos || {})) return true;
     if (JSON.stringify(original?.trabalho || {}) !== JSON.stringify(novo?.trabalho || {})) return true;
