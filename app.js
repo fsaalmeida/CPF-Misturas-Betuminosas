@@ -3384,7 +3384,8 @@ function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avar
         onDuplicate: onDuplicateFormula,
         onDeleteAll: onDeleteAllFormulas,
         onDeleteSelected: onDeleteSelectedFormulas,
-        onToggleIncluirCustos
+        onToggleIncluirCustos,
+        nomeUtilizadorAtual
       }
     );
   }
@@ -4445,7 +4446,7 @@ function IncidenciasSection({ center, diarias, avarias, canManage, isAdmin, onBa
     }) })
   ] });
 }
-function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, canManage, podeVerCustos, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onDuplicate, onDeleteAll, onDeleteSelected, onToggleIncluirCustos }) {
+function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, canManage, podeVerCustos, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onDuplicate, onDeleteAll, onDeleteSelected, onToggleIncluirCustos, nomeUtilizadorAtual }) {
   const [query, setQuery] = useState("");
   const [fichaCustoFormula, setFichaCustoFormula] = useState(null);
   const [mostrarListaCustos, setMostrarListaCustos] = useState(false);
@@ -4535,6 +4536,7 @@ function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra,
         maoDeObra,
         consumiveis,
         logotipo,
+        nomeUtilizadorAtual,
         onOpenFormula: (f) => {
           setMostrarListaCustos(false);
           onEdit(f);
@@ -7573,7 +7575,7 @@ const calcularCustoFormula = (formula, center, materiais, equipamentos, maoDeObr
     totalGeral
   };
 };
-function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, onOpenFormula, onClose }) {
+function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, nomeUtilizadorAtual, onOpenFormula, onClose }) {
   const [dataRef, setDataRef] = useState((/* @__PURE__ */ new Date()).toISOString().slice(0, 10));
   const [fatorK, setFatorK] = useState("1");
   const [exportarQue, setExportarQue] = useState("tudo");
@@ -7597,16 +7599,27 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
         ${mostrarVenda ? `<td style="text-align:right; font-weight:bold">${l.venda.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC</td>` : ""}
       </tr>`).join("");
     const numColunas = 2 + (mostrarCusto ? 1 : 0) + (mostrarVenda ? 1 : 0);
+    const agora = /* @__PURE__ */ new Date();
     const html = `<!DOCTYPE html>
       <html><head><meta charset="utf-8"><title>Custos das F\xF3rmulas \u2014 ${center?.nome || ""}</title>
       <style>
-        body { font-family: 'Arial Narrow', Arial, sans-serif; color: #1c1917; padding: 32px; max-width: 900px; margin: 0 auto; font-size: 13px; }
+        @page { size: A4 portrait; margin: 18mm 15mm 22mm 15mm;
+          @bottom-left { content: "Exportado em ${formatDatePT(agora.toISOString())} \xE0s ${agora.toTimeString().slice(0, 5)} por ${nomeUtilizadorAtual || "\u2014"}"; font-size: 8px; color: #a8a29e; font-family: Arial, sans-serif; }
+          @bottom-right { content: "P\xE1gina " counter(page) " de " counter(pages); font-size: 8px; color: #a8a29e; font-family: Arial, sans-serif; }
+        }
+        body { font-family: 'Arial Narrow', Arial, sans-serif; color: #1c1917; padding: 0; max-width: 100%; margin: 0; font-size: 13px; }
         .logo { max-height: 55px; margin-bottom: 16px; }
         h1 { font-size: 18px; margin-bottom: 2px; }
         .sub { color: #78716c; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
         th, td { border: 1px solid #d6d3d1; padding: 6px 8px; }
         th { background: #f5f5f4; text-align: left; font-size: 10px; text-transform: uppercase; }
+        tr { page-break-inside: avoid; }
+        .rodape-tela { display: none; }
+        @media screen {
+          body { padding: 32px; max-width: 900px; margin: 0 auto; }
+          .rodape-tela { display: block; margin-top: 24px; padding-top: 10px; border-top: 1px solid #e7e5e4; font-size: 10px; color: #a8a29e; }
+        }
       </style></head>
       <body>
         ${logotipo ? `<img class="logo" src="${logotipo}" alt="Log\xF3tipo" />` : ""}
@@ -7616,6 +7629,7 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
           <tr>${colunas}</tr>
           ${linhasHtml || `<tr><td colspan="${numColunas}" style="text-align:center">\u2014</td></tr>`}
         </table>
+        <p class="rodape-tela">Exportado em ${formatDatePT(agora.toISOString())} \xE0s ${agora.toTimeString().slice(0, 5)} por ${nomeUtilizadorAtual || "\u2014"} \u2014 este rodap\xE9 com a data, hora, utilizador e n\xFAmero de p\xE1gina aparece impresso ao imprimir ou gravar como PDF.</p>
       </body></html>`;
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
