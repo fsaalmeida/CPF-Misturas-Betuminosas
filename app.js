@@ -7590,7 +7590,7 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
     const mostrarCusto = exportarQue !== "so-venda";
     const mostrarVenda = exportarQue !== "so-custo";
     const agora = /* @__PURE__ */ new Date();
-    const rodapeTexto = `Exportado em ${formatDatePT(agora.toISOString())} \xE0s ${agora.toTimeString().slice(0, 5)} por ${nomeUtilizadorAtual || "\u2014"}`;
+    const rodapeTexto = `Exportado em ${formatDateTimePT(agora.toISOString())} por ${nomeUtilizadorAtual || "\u2014"}`;
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const margemEsq = 15;
     let y = 15;
