@@ -7558,23 +7558,25 @@ const calcularCustoFormula = (formula, center, materiais, equipamentos, maoDeObr
   }).filter(Boolean);
   const totalMaoDeObra = linhasMaoDeObra.reduce((s, l) => s + (l.custoPorTonelada || 0), 0);
   const totalGeral = totalDiretos + totalCombustao + totalEquipamento + totalMaoDeObra + totalFixos + totalVariaveis;
+  const arred2 = (v) => v === null || v === void 0 ? v : Math.round((v + Number.EPSILON) * 100) / 100;
+  const arredLinhas = (arr) => arr.map((l) => ({ ...l, custoPorTonelada: arred2(l.custoPorTonelada) }));
   return {
     anoRef,
     producaoDoAno,
-    linhasDiretos,
-    totalDiretos,
+    linhasDiretos: linhasDiretos.map((l) => ({ ...l, custo: arred2(l.custo) })),
+    totalDiretos: arred2(totalDiretos),
     temSemPreco,
-    linhasCombustao,
-    totalCombustao,
-    linhasEquipamento,
-    totalEquipamento,
-    linhasFixos,
-    totalFixos,
-    linhasVariaveis,
-    totalVariaveis,
-    linhasMaoDeObra,
-    totalMaoDeObra,
-    totalGeral
+    linhasCombustao: arredLinhas(linhasCombustao),
+    totalCombustao: arred2(totalCombustao),
+    linhasEquipamento: arredLinhas(linhasEquipamento),
+    totalEquipamento: arred2(totalEquipamento),
+    linhasFixos: arredLinhas(linhasFixos),
+    totalFixos: arred2(totalFixos),
+    linhasVariaveis: arredLinhas(linhasVariaveis),
+    totalVariaveis: arred2(totalVariaveis),
+    linhasMaoDeObra: arredLinhas(linhasMaoDeObra),
+    totalMaoDeObra: arred2(totalMaoDeObra),
+    totalGeral: arred2(totalGeral)
   };
 };
 function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, nomeUtilizadorAtual, onOpenFormula, onClose }) {
@@ -7584,7 +7586,7 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
   const k = parseFloat(fatorK) || 1;
   const linhas = [...formulas].filter((f) => f.incluirEmCustosTodas !== false).sort((a, b) => (a.codigo || "").localeCompare(b.codigo || "", "pt", { numeric: true, sensitivity: "base" })).map((f) => {
     const { totalGeral } = calcularCustoFormula(f, center, materiais, equipamentos, maoDeObra, dataRef, consumiveis);
-    return { id: f.id, codigo: f.codigo, designacao: f.designacao, observacoes: f.observacoes || "", custo: totalGeral, venda: totalGeral * k };
+    return { id: f.id, codigo: f.codigo, designacao: f.designacao, observacoes: f.observacoes || "", custo: totalGeral, venda: Math.round((totalGeral * k + Number.EPSILON) * 100) / 100 };
   });
   const exportar = () => {
     const mostrarCusto = exportarQue !== "so-venda";
@@ -7616,7 +7618,7 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
     doc.setTextColor(87, 83, 78);
     doc.text(nomeCentral, pageWidthTopo - margemDir, y + 9.5, { align: "right" });
     doc.setTextColor(120, 113, 108);
-    doc.text(`Data: ${formatDatePT(dataRef)}${mostrarVenda ? ` \xB7 Fator K: ${k.toLocaleString("pt-PT", { maximumFractionDigits: 2 })}` : ""}`, pageWidthTopo - margemDir, y + 14.5, { align: "right" });
+    doc.text(`Data: ${formatDatePT(dataRef)}${mostrarVenda ? ` \xB7 Fator K: ${k.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""}`, pageWidthTopo - margemDir, y + 14.5, { align: "right" });
     y += alturaCabecalho + 3;
     doc.setDrawColor(214, 211, 209);
     doc.setLineWidth(0.2);
@@ -7627,8 +7629,8 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
       l.codigo || "",
       l.designacao + (l.observacoes ? `
 Obs: ${l.observacoes}` : ""),
-      ...mostrarCusto ? [l.custo.toLocaleString("pt-PT", { maximumFractionDigits: 2 }) + " \u20AC"] : [],
-      ...mostrarVenda ? [l.venda.toLocaleString("pt-PT", { maximumFractionDigits: 2 }) + " \u20AC"] : []
+      ...mostrarCusto ? [l.custo.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20AC"] : [],
+      ...mostrarVenda ? [l.venda.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20AC"] : []
     ]);
     autoTable(doc, {
       head,
@@ -7710,11 +7712,11 @@ Obs: ${l.observacoes}` : ""),
               ] })
             ] }),
             /* @__PURE__ */ jsxs("td", { className: "px-3 py-2 text-right font-mono-data text-stone-600", children: [
-              l.custo.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+              l.custo.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
               " \u20AC"
             ] }),
             /* @__PURE__ */ jsxs("td", { className: "px-3 py-2 text-right font-mono-data font-semibold text-stone-800", children: [
-              l.venda.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+              l.venda.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
               " \u20AC"
             ] })
           ]
@@ -7745,22 +7747,22 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
     totalGeral
   } = calcularCustoFormula(formula, center, materiais, equipamentos, maoDeObra, dataRef, consumiveis);
   const k = parseFloat(fatorK) || 1;
-  const totalComFatorK = totalGeral * k;
+  const totalComFatorK = Math.round((totalGeral * k + Number.EPSILON) * 100) / 100;
   const exportarFichaCusto = () => {
     const linhaHtml = (nome, valorTxt, custoTxt, aviso) => `
       <tr><td>${nome}${aviso ? `<br><span style="font-size:10px;color:#b45309">${aviso}</span>` : ""}</td><td style="text-align:right">${valorTxt}</td><td style="text-align:right; font-weight:bold">${custoTxt}</td></tr>`;
     const tabelaDiretos = linhasDiretos.map((l) => `
       <tr>
         <td>${l.origem}</td><td>${l.designacao}</td>
-        <td style="text-align:right">${l.kgPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })}</td>
+        <td style="text-align:right">${l.kgPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td style="text-align:right">${l.precoUnitario !== null ? l.precoUnitario.toLocaleString("pt-PT", { maximumFractionDigits: 3 }) + " \u20AC" : "sem pre\xE7o"}</td>
-        <td style="text-align:right; font-weight:bold">${l.custo !== null ? l.custo.toLocaleString("pt-PT", { maximumFractionDigits: 2 }) + " \u20AC" : "\u2014"}</td>
+        <td style="text-align:right; font-weight:bold">${l.custo !== null ? l.custo.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20AC" : "\u2014"}</td>
       </tr>`).join("");
-    const tabelaCombustao = linhasCombustao.map((l) => linhaHtml(l.nome, l.consumo !== null ? `${l.consumo.toLocaleString("pt-PT", { maximumFractionDigits: 3 })} ${l.unidadeConsumo}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
-    const tabelaEquip = linhasEquipamento.map((l) => linhaHtml(l.nome, l.valor !== null ? `${l.valor.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
-    const tabelaMaoObra = linhasMaoDeObra.map((l) => linhaHtml(`${l.nome} (qtd. ${l.quantidade ?? "\u2014"})`, l.valorUnitario !== null ? `${l.valorUnitario.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
-    const tabelaFixos = linhasFixos.map((l) => linhaHtml(l.nome, `${l.valor.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/ano`, l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
-    const tabelaVariaveis = linhasVariaveis.map((l) => linhaHtml(l.nome, `${l.valor.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} ${l.unidade}`, l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
+    const tabelaCombustao = linhasCombustao.map((l) => linhaHtml(l.nome, l.consumo !== null ? `${l.consumo.toLocaleString("pt-PT", { maximumFractionDigits: 3 })} ${l.unidadeConsumo}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
+    const tabelaEquip = linhasEquipamento.map((l) => linhaHtml(l.nome, l.valor !== null ? `${l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
+    const tabelaMaoObra = linhasMaoDeObra.map((l) => linhaHtml(`${l.nome} (qtd. ${l.quantidade ?? "\u2014"})`, l.valorUnitario !== null ? `${l.valorUnitario.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
+    const tabelaFixos = linhasFixos.map((l) => linhaHtml(l.nome, `${l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/ano`, l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
+    const tabelaVariaveis = linhasVariaveis.map((l) => linhaHtml(l.nome, `${l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${l.unidade}`, l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
     const html = `<!DOCTYPE html>
       <html><head><meta charset="utf-8"><title>Ficha de Custo \u2014 ${formula.codigo}</title>
       <style>
@@ -7781,53 +7783,53 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
         ${logotipo ? `<img class="logo" src="${logotipo}" alt="Log\xF3tipo" />` : ""}
         <h1>Ficha de Custo</h1>
         <p class="sub">${formula.codigo} \u2014 ${formula.designacao} \xB7 ${center?.nome || ""}</p>
-        <p style="font-size:12px; color:#44403c;">Custo \xE0 data: <strong>${formatDatePT(dataRef)}</strong> \xB7 Fator K: <strong>${k.toLocaleString("pt-PT", { maximumFractionDigits: 2 })}</strong></p>
+        <p style="font-size:12px; color:#44403c;">Custo \xE0 data: <strong>${formatDatePT(dataRef)}</strong> \xB7 Fator K: <strong>${k.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></p>
 
         <h2>1 \u2014 Custos Diretos (materiais constituintes)</h2>
         <table>
           <tr><th>Origem</th><th>Material</th><th style="text-align:right">kg/t</th><th style="text-align:right">Pre\xE7o</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
           ${tabelaDiretos || '<tr><td colspan="5" style="text-align:center">\u2014</td></tr>'}
         </table>
-        <p class="subtotal">Subtotal Diretos: ${totalDiretos.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t</p>
+        <p class="subtotal">Subtotal Diretos: ${totalDiretos.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
 
         <h2>2 \u2014 Bloco T\xE9rmico e Queimador Tambor Secador</h2>
         <table>
           <tr><th>Origem</th><th style="text-align:right">Consumo</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
           ${tabelaCombustao || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
         </table>
-        <p class="subtotal">Subtotal Bloco T\xE9rmico/Queimador: ${totalCombustao.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t</p>
+        <p class="subtotal">Subtotal Bloco T\xE9rmico/Queimador: ${totalCombustao.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
 
         <h2>3 \u2014 Custo Equipamento</h2>
         <table>
           <tr><th>Equipamento</th><th style="text-align:right">Valor</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
           ${tabelaEquip || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
         </table>
-        <p class="subtotal">Subtotal Equipamento: ${totalEquipamento.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t</p>
+        <p class="subtotal">Subtotal Equipamento: ${totalEquipamento.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
 
         <h2>4 \u2014 M\xE3o de Obra</h2>
         <table>
           <tr><th>Categoria</th><th style="text-align:right">Valor</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
           ${tabelaMaoObra || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
         </table>
-        <p class="subtotal">Subtotal M\xE3o de Obra: ${totalMaoDeObra.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t</p>
+        <p class="subtotal">Subtotal M\xE3o de Obra: ${totalMaoDeObra.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
 
         <h2>5 \u2014 Custos Fixos</h2>
         <table>
           <tr><th>Custo</th><th style="text-align:right">Valor Anual</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
           ${tabelaFixos || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
         </table>
-        <p class="subtotal">Subtotal Custos Fixos: ${totalFixos.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t</p>
+        <p class="subtotal">Subtotal Custos Fixos: ${totalFixos.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
 
         <h2>6 \u2014 Custos Vari\xE1veis</h2>
         <table>
           <tr><th>Custo</th><th style="text-align:right">Valor</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
           ${tabelaVariaveis || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
         </table>
-        <p class="subtotal">Subtotal Custos Vari\xE1veis: ${totalVariaveis.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t</p>
+        <p class="subtotal">Subtotal Custos Vari\xE1veis: ${totalVariaveis.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
 
         <div class="totalfinal">
-          <span class="label">Total Geral (sem Fator K): ${totalGeral.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC/t<br>Total Final (com Fator K \xD7 ${k.toLocaleString("pt-PT", { maximumFractionDigits: 2 })})</span>
-          <span class="valor">${totalComFatorK.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC / t</span>
+          <span class="label">Total Geral (sem Fator K): ${totalGeral.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t<br>Total Final (com Fator K \xD7 ${k.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+          <span class="valor">${totalComFatorK.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC / t</span>
         </div>
       </body></html>`;
     const blob = new Blob([html], { type: "text/html" });
@@ -7862,16 +7864,16 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
       /* @__PURE__ */ jsx("tbody", { children: linhasDiretos.map((l, i) => /* @__PURE__ */ jsxs("tr", { className: i !== linhasDiretos.length - 1 ? "border-b border-stone-100" : "", children: [
         /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-stone-500", children: l.origem }),
         /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-stone-800", children: l.designacao }),
-        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data", children: l.kgPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 }) }),
+        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data", children: l.kgPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
         /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data", children: l.precoUnitario !== null ? `${l.precoUnitario.toLocaleString("pt-PT", { maximumFractionDigits: 3 })} \u20AC` : /* @__PURE__ */ jsx("span", { className: "text-red-500", children: "sem pre\xE7o" }) }),
-        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custo !== null ? `${l.custo.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
+        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custo !== null ? `${l.custo.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
       ] }, l.key)) })
     ] }) }),
     temSemPreco && /* @__PURE__ */ jsx("p", { className: "text-xs text-red-600 mb-3", children: "H\xE1 materiais sem pre\xE7o em vigor nesta data \u2014 o total fica incompleto at\xE9 indicar um pre\xE7o para eles." }),
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-stone-100 rounded-lg px-4 py-2.5 mb-5", children: [
       /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-stone-700", children: "Subtotal Diretos" }),
       /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-stone-800", children: [
-        totalDiretos.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+        totalDiretos.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         " \u20AC / t"
       ] })
     ] }),
@@ -7889,13 +7891,13 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
           l.aviso && /* @__PURE__ */ jsx("span", { className: "block text-[11px] text-amber-600 mt-0.5", children: l.aviso })
         ] }),
         /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data", children: l.consumo !== null ? `${l.consumo.toLocaleString("pt-PT", { maximumFractionDigits: 3 })} ${l.unidadeConsumo}` : "\u2014" }),
-        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
+        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
       ] }, l.key)) })
     ] }) }),
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-stone-100 rounded-lg px-4 py-2.5 mb-5", children: [
       /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-stone-700", children: "Subtotal Bloco T\xE9rmico/Queimador" }),
       /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-stone-800", children: [
-        totalCombustao.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+        totalCombustao.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         " \u20AC / t"
       ] })
     ] }),
@@ -7912,14 +7914,14 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
           l.nome,
           l.aviso && /* @__PURE__ */ jsx("span", { className: "block text-[11px] text-amber-600 mt-0.5", children: l.aviso })
         ] }),
-        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data", children: l.valor !== null ? `${l.valor.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014" }),
-        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
+        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data", children: l.valor !== null ? `${l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014" }),
+        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
       ] }, l.key)) })
     ] }) }),
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-stone-100 rounded-lg px-4 py-2.5 mb-5", children: [
       /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-stone-700", children: "Subtotal Equipamento" }),
       /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-stone-800", children: [
-        totalEquipamento.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+        totalEquipamento.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         " \u20AC / t"
       ] })
     ] }),
@@ -7941,14 +7943,14 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
           l.aviso && /* @__PURE__ */ jsx("span", { className: "block text-[11px] text-amber-600 mt-0.5", children: l.aviso })
         ] }),
         /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data", children: l.quantidade }),
-        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data", children: l.valorUnitario !== null ? `${l.valorUnitario.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014" }),
-        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
+        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data", children: l.valorUnitario !== null ? `${l.valorUnitario.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014" }),
+        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
       ] }, l.key)) })
     ] }) }),
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-stone-100 rounded-lg px-4 py-2.5 mb-5", children: [
       /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-stone-700", children: "Subtotal M\xE3o de Obra" }),
       /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-stone-800", children: [
-        totalMaoDeObra.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+        totalMaoDeObra.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         " \u20AC / t"
       ] })
     ] }),
@@ -7966,16 +7968,16 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
           l.aviso && /* @__PURE__ */ jsx("span", { className: "block text-[11px] text-amber-600 mt-0.5", children: l.aviso })
         ] }),
         /* @__PURE__ */ jsxs("td", { className: "px-3 py-2 text-right font-mono-data", children: [
-          l.valor.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+          l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
           " \u20AC"
         ] }),
-        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
+        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
       ] }, l.key)) })
     ] }) }),
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-stone-100 rounded-lg px-4 py-2.5 mb-5", children: [
       /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-stone-700", children: "Subtotal Custos Fixos" }),
       /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-stone-800", children: [
-        totalFixos.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+        totalFixos.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         " \u20AC / t"
       ] })
     ] }),
@@ -7993,35 +7995,35 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
           l.aviso && /* @__PURE__ */ jsx("span", { className: "block text-[11px] text-amber-600 mt-0.5", children: l.aviso })
         ] }),
         /* @__PURE__ */ jsxs("td", { className: "px-3 py-2 text-right font-mono-data", children: [
-          l.valor.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+          l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
           " ",
           l.unidade
         ] }),
-        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
+        /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right font-mono-data font-semibold", children: l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014" })
       ] }, l.key)) })
     ] }) }),
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-stone-100 rounded-lg px-4 py-2.5 mb-5", children: [
       /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-stone-700", children: "Subtotal Custos Vari\xE1veis" }),
       /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-stone-800", children: [
-        totalVariaveis.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+        totalVariaveis.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         " \u20AC / t"
       ] })
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-stone-100 rounded-lg px-4 py-2.5 mb-2", children: [
       /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-stone-700", children: "Total Geral (1 a 5), sem Fator K" }),
       /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-stone-800", children: [
-        totalGeral.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+        totalGeral.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         " \u20AC / t"
       ] })
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-amber-50 rounded-lg px-4 py-3 mb-4", children: [
       /* @__PURE__ */ jsxs("span", { className: "text-sm font-semibold text-amber-800", children: [
         "Total Final (com Fator K \xD7 ",
-        k.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+        k.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         ")"
       ] }),
       /* @__PURE__ */ jsxs("span", { className: "font-mono-data font-semibold text-lg text-amber-800", children: [
-        totalComFatorK.toLocaleString("pt-PT", { maximumFractionDigits: 2 }),
+        totalComFatorK.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         " \u20AC / t"
       ] })
     ] })
