@@ -7593,27 +7593,35 @@ function ListaCustosFormulasModal({ center, formulas, materiais, equipamentos, m
     const rodapeTexto = `Exportado em ${formatDateTimePT(agora.toISOString())} por ${nomeUtilizadorAtual || "\u2014"}`;
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const margemEsq = 15;
+    const margemDir = 15;
+    const pageWidthTopo = doc.internal.pageSize.getWidth();
     let y = 15;
+    const alturaCabecalho = 18;
     if (logotipo) {
       try {
         const img = new Image();
         img.src = logotipo;
         const proporcao = img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 3;
-        const alturaLogo = 14;
-        doc.addImage(logotipo, margemEsq, y, alturaLogo * proporcao, alturaLogo);
-        y += alturaLogo + 4;
+        doc.addImage(logotipo, margemEsq, y, alturaCabecalho * proporcao, alturaCabecalho);
       } catch {
       }
     }
+    const nomeCentral = center?.codigo ? `${center.codigo} \u2014 ${center.nome || ""}` : center?.nome || "";
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(15);
+    doc.setFontSize(13);
     doc.setTextColor(28, 25, 23);
-    doc.text("Custo Final das Misturas", margemEsq, y);
-    y += 6;
+    doc.text("Custo Final das Misturas", pageWidthTopo - margemDir, y + 4, { align: "right" });
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
+    doc.setTextColor(87, 83, 78);
+    doc.text(nomeCentral, pageWidthTopo - margemDir, y + 9.5, { align: "right" });
     doc.setTextColor(120, 113, 108);
-    doc.text(`${(center?.nome || "").toUpperCase()} \u2014 \xC0 DATA: ${formatDatePT(dataRef).toUpperCase()}${mostrarVenda ? ` \xB7 FATOR K: ${k.toLocaleString("pt-PT", { maximumFractionDigits: 2 })}` : ""}`, margemEsq, y);
+    doc.text(`Data: ${formatDatePT(dataRef)}${mostrarVenda ? ` \xB7 Fator K: ${k.toLocaleString("pt-PT", { maximumFractionDigits: 2 })}` : ""}`, pageWidthTopo - margemDir, y + 14.5, { align: "right" });
+    y += alturaCabecalho + 3;
+    doc.setDrawColor(214, 211, 209);
+    doc.setLineWidth(0.2);
+    doc.line(margemEsq, y, pageWidthTopo - margemDir, y);
+    y += 4;
     const head = [["C\xF3digo", "Designa\xE7\xE3o", ...mostrarCusto ? ["Custo (\u20AC/t)"] : [], ...mostrarVenda ? ["Venda (\u20AC/t)"] : []]];
     const body = linhas.map((l) => [
       l.codigo || "",
@@ -7625,7 +7633,7 @@ Obs: ${l.observacoes}` : ""),
     autoTable(doc, {
       head,
       body,
-      startY: y + 6,
+      startY: y,
       margin: { left: margemEsq, right: margemEsq, bottom: 16 },
       styles: { font: "helvetica", fontSize: 9, cellPadding: 2.2, lineColor: [214, 211, 209], lineWidth: 0.1 },
       headStyles: { fillColor: [245, 245, 244], textColor: [87, 83, 78], fontStyle: "bold", fontSize: 8 },
