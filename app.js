@@ -620,6 +620,7 @@ function App() {
   const podeRegistar = canManageArticles || currentUser?.role === "Operador";
   const podeVerCustos = canManageArticles || currentUser?.role === "Or\xE7amentista";
   const podeVerClientesFornecedores = canManageArticles || currentUser?.role === "Or\xE7amentista" || currentUser?.role === "Operador";
+  const podeCriarFornecedores = canManageArticles || currentUser?.role === "Or\xE7amentista";
   const podeGerirObras = canManageArticles || currentUser?.role === "Or\xE7amentista";
   const podeVerMateriais = isAdmin || currentUser?.role === "Or\xE7amentista";
   const podeAtualizarPrecoMateriais = isAdmin || currentUser?.role === "Or\xE7amentista";
@@ -2017,6 +2018,7 @@ function App() {
         {
           fornecedores,
           canManage: canManageArticles,
+          podeCriarFornecedores,
           onAdd: () => setModal({ type: "fornecedor" }),
           onEdit: (f) => setModal({ type: "fornecedor", data: f }),
           onImport: () => setModal({ type: "importFornecedores" }),
@@ -2773,7 +2775,7 @@ function ClientesView({ clientes, centrosCusto, canManage, onAdd, onImport, onOp
     }) })
   ] });
 }
-function FornecedoresView({ fornecedores, canManage, onAdd, onEdit, onImport, onDelete, onBack }) {
+function FornecedoresView({ fornecedores, canManage, podeCriarFornecedores, onAdd, onEdit, onImport, onDelete, onBack }) {
   const [query, setQuery] = useState("");
   const filtrados = (query ? fornecedores.filter((f) => matchesSearch(query, f.designacao, f.nif, f.numero)) : fornecedores).slice().sort((a, b) => (a.numero || "").localeCompare(b.numero || "", "pt", { numeric: true, sensitivity: "base" }));
   return /* @__PURE__ */ jsxs("div", { className: "p-8 max-w-4xl", children: [
@@ -2807,7 +2809,7 @@ function FornecedoresView({ fornecedores, canManage, onAdd, onEdit, onImport, on
           /* @__PURE__ */ jsx(FileSpreadsheet, { size: 15 }),
           " Importar Excel"
         ] }),
-        canManage && /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
+        podeCriarFornecedores && /* @__PURE__ */ jsxs("button", { onClick: onAdd, className: "flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700", children: [
           /* @__PURE__ */ jsx(Plus, { size: 16 }),
           " Novo Fornecedor"
         ] })
