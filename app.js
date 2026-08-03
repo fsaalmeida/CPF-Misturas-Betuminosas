@@ -197,6 +197,14 @@ const calcValidade = (dataExecucao) => {
   d.setFullYear(d.getFullYear() + VALIDADE_ANOS);
   return d.toISOString().slice(0, 10);
 };
+const dataOrdenacaoDiaria = (d) => {
+  const tIni = d.dataInicio ? (/* @__PURE__ */ new Date(`${d.dataInicio}T00:00:00Z`)).getTime() : NaN;
+  if (isNaN(tIni)) return NaN;
+  if (!d.dataFim || d.dataFim === d.dataInicio) return tIni;
+  const tFim = (/* @__PURE__ */ new Date(`${d.dataFim}T00:00:00Z`)).getTime();
+  if (isNaN(tFim)) return tIni;
+  return (tIni + tFim) / 2;
+};
 const formatDatePT = (iso) => {
   if (!iso) return "\u2014";
   const [y, m, d] = iso.split("-");
@@ -4822,7 +4830,8 @@ function ExportarProducaoMensalModal({ center, diarias, clientes, centrosCusto, 
   ] });
 }
 function GraficoProducaoModal({ diarias, center, onClose }) {
-  const anos = [...new Set(diarias.filter((d) => d.dataInicio).map((d) => new Date(d.dataInicio).getFullYear()))].sort((a, b) => b - a);
+  const dataRef = (d) => d.dataFim || d.dataInicio;
+  const anos = [...new Set(diarias.filter((d) => dataRef(d)).map((d) => new Date(dataRef(d)).getFullYear()))].sort((a, b) => b - a);
   const anoAtual = (/* @__PURE__ */ new Date()).getFullYear();
   const [ano, setAno] = useState(anos.includes(anoAtual) ? anoAtual : anos[0] || anoAtual);
   const diaDoAno = (isoDate) => Math.round((new Date(isoDate) - /* @__PURE__ */ new Date(`${ano}-01-01`)) / 864e5) + 1;
@@ -4831,9 +4840,10 @@ function GraficoProducaoModal({ diarias, center, onClose }) {
   const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
   const ticksMeses = MESES.map((_, i) => diaDoAno(new Date(ano, i, 1).toISOString().slice(0, 10)));
   const porDia = {};
-  diarias.filter((d) => d.dataInicio && new Date(d.dataInicio).getFullYear() === ano).forEach((d) => {
+  diarias.filter((d) => dataRef(d) && new Date(dataRef(d)).getFullYear() === ano).forEach((d) => {
     const total = (d.linhas || []).reduce((s, l) => s + (parseFloat(l.toneladas) || 0), 0);
-    porDia[d.dataInicio] = (porDia[d.dataInicio] || 0) + total;
+    const chave = dataRef(d);
+    porDia[chave] = (porDia[chave] || 0) + total;
   });
   let acumulado = 0;
   const chartData = Object.keys(porDia).sort().map((data) => {
@@ -4948,14 +4958,6 @@ function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, can
     }))),
     ...(avarias || []).filter((a) => !a.resolucaoData).map((a) => ({ key: a.id, id: a.id, data: a.data, descricao: a.descricao, origem: "Manual", raw: a }))
   ].sort((x, y) => (x.data || "").localeCompare(y.data || ""));
-  const dataOrdenacaoDiaria = (d) => {
-    const tIni = d.dataInicio ? (/* @__PURE__ */ new Date(`${d.dataInicio}T00:00:00Z`)).getTime() : NaN;
-    if (isNaN(tIni)) return 0;
-    if (!d.dataFim || d.dataFim === d.dataInicio) return tIni;
-    const tFim = (/* @__PURE__ */ new Date(`${d.dataFim}T00:00:00Z`)).getTime();
-    if (isNaN(tFim)) return tIni;
-    return (tIni + tFim) / 2;
-  };
   const ULTIMAS = 30;
   const todasOrdenadas = [...diarias].sort((a, b) => dataOrdenacaoDiaria(b) - dataOrdenacaoDiaria(a));
   const sorted = searchDate ? todasOrdenadas.filter((d) => d.dataInicio === searchDate) : todasOrdenadas.slice(0, ULTIMAS);
@@ -7005,8 +7007,9 @@ function DiariaModal({ data, artigos, clientes, centrosCusto, diarias, avarias, 
   const totalToneladas = linhasFlat.reduce((s, l) => s + (parseFloat(l.toneladas) || 0), 0);
   const turno = dataInicio && dataFim ? dataFim === dataInicio ? "Diurno" : dataFim > dataInicio ? "Noturno" : "" : "";
   const dataFimInvalida = !!(dataInicio && dataFim && (dataFim < dataInicio || !isDataCalendarioValida(dataInicio) || !isDataCalendarioValida(dataFim)));
+  const pontoMedioAtual = dataOrdenacaoDiaria({ dataInicio, dataFim });
   const anoRef = dataInicio ? new Date(dataInicio).getFullYear() : (/* @__PURE__ */ new Date()).getFullYear();
-  const acumuladoAnual = (diarias || []).filter((d) => d.id !== data?.id && d.dataInicio && new Date(d.dataInicio).getFullYear() === anoRef && d.dataInicio <= dataInicio).reduce((s, d) => s + (d.linhas || []).reduce((s2, l) => s2 + (parseFloat(l.toneladas) || 0), 0), 0) + totalToneladas;
+  const acumuladoAnual = (diarias || []).filter((d) => d.id !== data?.id && d.dataInicio && new Date(d.dataInicio).getFullYear() === anoRef && !isNaN(dataOrdenacaoDiaria(d)) && dataOrdenacaoDiaria(d) <= pontoMedioAtual).reduce((s, d) => s + (d.linhas || []).reduce((s2, l) => s2 + (parseFloat(l.toneladas) || 0), 0), 0) + totalToneladas;
   const dataReferenciaPendentes = dataInicio || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   const diasAberto = (dIni) => Math.max(0, Math.round((new Date(dataReferenciaPendentes) - new Date(dIni)) / 864e5));
   const pendentes = [
