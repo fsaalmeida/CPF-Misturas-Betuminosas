@@ -1795,7 +1795,7 @@ function App() {
             ]
           }
         ),
-        isAdmin && /* @__PURE__ */ jsxs(
+        podeVerMateriais && /* @__PURE__ */ jsxs(
           "button",
           {
             onClick: () => setView("consumiveis"),
@@ -2052,7 +2052,7 @@ function App() {
           onDeleteTipoCustoExtra: deleteTipoCustoExtra
         }
       ),
-      view === "consumiveis" && isAdmin && /* @__PURE__ */ jsx(
+      view === "consumiveis" && podeVerMateriais && /* @__PURE__ */ jsx(
         MateriaisView,
         {
           tipo: "consumivel",
