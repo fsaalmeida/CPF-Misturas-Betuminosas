@@ -3357,6 +3357,7 @@ function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avar
         maoDeObra,
         consumiveis,
         logotipo,
+        nomeUtilizadorAtual,
         onBack: () => setSection(null),
         onAdd: onAddDiaria,
         onEdit: onEditDiaria,
@@ -4665,7 +4666,7 @@ function FormulasSection({ center, formulas, materiais, equipamentos, maoDeObra,
     fichaCustoFormula && /* @__PURE__ */ jsx(FichaCustoModal, { formula: fichaCustoFormula, center, materiais: materiais || [], equipamentos: equipamentos || [], maoDeObra: maoDeObra || [], consumiveis: consumiveis || [], logotipo, onClose: () => setFichaCustoFormula(null) })
   ] });
 }
-function ExportarProducaoMensalModal({ center, diarias, clientes, centrosCusto, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, onClose }) {
+function ExportarProducaoMensalModal({ center, diarias, clientes, centrosCusto, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, nomeUtilizadorAtual, onClose }) {
   const [mesAno, setMesAno] = useState((/* @__PURE__ */ new Date()).toISOString().slice(0, 7));
   const [clienteId, setClienteId] = useState("");
   const nomeCliente = (id) => clientes.find((c) => c.id === id)?.designacao || "\u2014";
@@ -4690,50 +4691,84 @@ function ExportarProducaoMensalModal({ center, diarias, clientes, centrosCusto, 
   const [ano, mesNum] = mesAno.split("-");
   const nomeMes = (/* @__PURE__ */ new Date(`${mesAno}-01T00:00:00Z`)).toLocaleDateString("pt-PT", { month: "long", year: "numeric", timeZone: "UTC" });
   const exportar = () => {
-    const linhasHtml = linhasComCusto.map((l) => `
-      <tr>
-        <td>${formatDatePT(l.data)}</td>
-        <td>${nomeCliente(l.clienteId)}</td>
-        <td>${nomeObra(l.centroCustoId) || "\u2014"}</td>
-        <td>${l.misturaLabel}</td>
-        <td style="text-align:right">${l.toneladas.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} t</td>
-        <td style="text-align:right">${l.custoUnitario !== null ? l.custoUnitario.toLocaleString("pt-PT", { maximumFractionDigits: 2 }) + " \u20AC/t" : "\u2014"}</td>
-        <td style="text-align:right; font-weight:bold">${l.custoTotal !== null ? l.custoTotal.toLocaleString("pt-PT", { maximumFractionDigits: 2 }) + " \u20AC" : "\u2014"}</td>
-      </tr>`).join("");
-    const html = `<!DOCTYPE html>
-      <html><head><meta charset="utf-8"><title>Produ\xE7\xE3o Mensal \u2014 ${center?.nome || ""}</title>
-      <style>
-        body { font-family: 'Arial Narrow', Arial, sans-serif; color: #1c1917; padding: 32px; max-width: 1000px; margin: 0 auto; font-size: 13px; }
-        .logo { max-height: 55px; margin-bottom: 16px; }
-        h1 { font-size: 18px; margin-bottom: 2px; text-transform: capitalize; }
-        .sub { color: #78716c; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-        th, td { border: 1px solid #d6d3d1; padding: 6px 8px; }
-        th { background: #f5f5f4; text-align: left; font-size: 10px; text-transform: uppercase; }
-        .totais { margin-top: 16px; padding: 12px 16px; background: #fef3c7; border-radius: 8px; display: flex; justify-content: space-between; font-weight: bold; }
-      </style></head>
-      <body>
-        ${logotipo ? `<img class="logo" src="${logotipo}" alt="Log\xF3tipo" />` : ""}
-        <h1>Produ\xE7\xE3o Mensal${clienteId ? ` \u2014 ${nomeCliente(clienteId)}` : ""}</h1>
-        <p class="sub">${center?.nome || ""} \u2014 ${nomeMes}</p>
-        <table>
-          <tr><th>Data</th><th>Cliente</th><th>Obra</th><th>Mistura</th><th style="text-align:right">Toneladas</th><th style="text-align:right">Custo Unit.</th><th style="text-align:right">Custo Total</th></tr>
-          ${linhasHtml || '<tr><td colspan="7" style="text-align:center">Sem produ\xE7\xE3o neste per\xEDodo</td></tr>'}
-        </table>
-        <div class="totais">
-          <span>Total: ${totalToneladas.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} t</span>
-          <span>Custo Total: ${totalCusto.toLocaleString("pt-PT", { maximumFractionDigits: 2 })} \u20AC</span>
-        </div>
-      </body></html>`;
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Producao_Mensal_${mesAno}_${center?.nome || "centro"}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const agora = /* @__PURE__ */ new Date();
+    const rodapeTexto = `Exportado em ${formatDateTimePT(agora.toISOString())} por ${nomeUtilizadorAtual || "\u2014"}`;
+    const nomeCentral = center?.codigo ? `${center.codigo} \u2014 ${center.nome || ""}` : center?.nome || "";
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const margemEsq = 15;
+    const margemDir = 15;
+    const pageWidthTopo = doc.internal.pageSize.getWidth();
+    let y = 15;
+    const alturaCabecalho = 18;
+    if (logotipo) {
+      try {
+        const formatoMatch = /^data:image\/(\w+);/.exec(logotipo);
+        const formato = formatoMatch ? formatoMatch[1].toUpperCase().replace("JPG", "JPEG") : "PNG";
+        const propsImg = doc.getImageProperties(logotipo);
+        const proporcao = propsImg.width && propsImg.height ? propsImg.width / propsImg.height : 3;
+        doc.addImage(logotipo, formato, margemEsq, y, alturaCabecalho * proporcao, alturaCabecalho);
+      } catch {
+      }
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(28, 25, 23);
+    doc.text(`Produ\xE7\xE3o Mensal${clienteId ? ` \u2014 ${nomeCliente(clienteId)}` : ""}`, pageWidthTopo - margemDir, y + 4, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(87, 83, 78);
+    doc.text(nomeCentral, pageWidthTopo - margemDir, y + 9.5, { align: "right" });
+    doc.setTextColor(120, 113, 108);
+    doc.text(nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1), pageWidthTopo - margemDir, y + 14.5, { align: "right" });
+    y += alturaCabecalho + 3;
+    doc.setDrawColor(214, 211, 209);
+    doc.setLineWidth(0.2);
+    doc.line(margemEsq, y, pageWidthTopo - margemDir, y);
+    y += 4;
+    autoTable(doc, {
+      head: [["Data", "Cliente", "Obra", "Mistura", "Toneladas", "Custo Unit.", "Custo Total"]],
+      body: linhasComCusto.map((l) => [
+        formatDatePT(l.data),
+        nomeCliente(l.clienteId),
+        nomeObra(l.centroCustoId) || "\u2014",
+        l.misturaLabel,
+        `${l.toneladas.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t`,
+        l.custoUnitario !== null ? `${l.custoUnitario.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t` : "\u2014",
+        l.custoTotal !== null ? `${l.custoTotal.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014"
+      ]),
+      startY: y,
+      margin: { left: margemEsq, right: margemDir, bottom: 16 },
+      styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2.2, lineColor: [214, 211, 209], lineWidth: 0.1 },
+      headStyles: { fillColor: [245, 245, 244], textColor: [87, 83, 78], fontStyle: "bold", fontSize: 7.5 },
+      alternateRowStyles: { fillColor: [250, 250, 249] },
+      columnStyles: { 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right", fontStyle: "bold" } },
+      didDrawPage: () => {
+        const pageHeight2 = doc.internal.pageSize.getHeight();
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(168, 162, 158);
+        doc.text(rodapeTexto, margemEsq, pageHeight2 - 8);
+      }
+    });
+    const finalY = doc.lastAutoTable.finalY + 6;
+    doc.setFillColor(254, 243, 199);
+    doc.roundedRect(margemEsq, finalY, pageWidthTopo - margemEsq - margemDir, 9, 1.5, 1.5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(146, 64, 14);
+    doc.text(`Total: ${totalToneladas.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t`, margemEsq + 3, finalY + 6);
+    doc.text(`Custo Total: ${totalCusto.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC`, pageWidthTopo - margemDir - 3, finalY + 6, { align: "right" });
+    const totalPaginas = doc.internal.getNumberOfPages();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    for (let i = 1; i <= totalPaginas; i++) {
+      doc.setPage(i);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(168, 162, 158);
+      doc.text(`P\xE1gina ${i} de ${totalPaginas}`, pageWidth - margemDir, pageHeight - 8, { align: "right" });
+    }
+    doc.save(`Producao_Mensal_${mesAno}_${center?.nome || "centro"}.pdf`);
   };
   return /* @__PURE__ */ jsxs(Modal, { title: "Exportar Produ\xE7\xE3o Mensal", subtitle: center?.nome || "", onClose, wide: true, children: [
     /* @__PURE__ */ jsxs("div", { className: "flex items-end gap-3 mb-5", children: [
@@ -4889,7 +4924,7 @@ function GraficoProducaoModal({ diarias, center, onClose }) {
     ] })
   ] });
 }
-function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, canManage, podeRegistar, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onOpenDiaria, onOpenResolucao, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo }) {
+function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, canManage, podeRegistar, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onOpenDiaria, onOpenResolucao, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, nomeUtilizadorAtual }) {
   const [searchDate, setSearchDate] = useState("");
   const [mostrarGrafico, setMostrarGrafico] = useState(false);
   const [mostrarExportarMensal, setMostrarExportarMensal] = useState(false);
@@ -5027,6 +5062,7 @@ function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, can
         maoDeObra,
         consumiveis,
         logotipo,
+        nomeUtilizadorAtual,
         onClose: () => setMostrarExportarMensal(false)
       }
     ),
