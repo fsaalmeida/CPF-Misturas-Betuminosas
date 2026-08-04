@@ -199,11 +199,7 @@ const calcValidade = (dataExecucao) => {
 };
 const dataOrdenacaoDiaria = (d) => {
   const tIni = d.dataInicio ? (/* @__PURE__ */ new Date(`${d.dataInicio}T00:00:00Z`)).getTime() : NaN;
-  if (isNaN(tIni)) return NaN;
-  if (!d.dataFim || d.dataFim === d.dataInicio) return tIni;
-  const tFim = (/* @__PURE__ */ new Date(`${d.dataFim}T00:00:00Z`)).getTime();
-  if (isNaN(tFim)) return tIni;
-  return (tIni + tFim) / 2;
+  return tIni;
 };
 const formatDatePT = (iso) => {
   if (!iso) return "\u2014";
@@ -7118,7 +7114,7 @@ function DiariaModal({ data, artigos, clientes, centrosCusto, diarias, avarias, 
     doc.setTextColor(87, 83, 78);
     doc.text(nomeCentral, pageWidth - margemDir, y + 9.5, { align: "right" });
     doc.setTextColor(120, 113, 108);
-    doc.text(`${formatDatePT(dataInicio)} \u2192 ${formatDatePT(dataFim)} \xB7 Turno: ${turno || "\u2014"}`, pageWidth - margemDir, y + 14.5, { align: "right" });
+    doc.text(`${formatDatePT(dataInicio)} \xB7 Turno: ${turno || "\u2014"}`, pageWidth - margemDir, y + 14.5, { align: "right" });
     y += alturaCabecalho + 3;
     doc.setDrawColor(214, 211, 209);
     doc.setLineWidth(0.2);
