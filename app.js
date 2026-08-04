@@ -3363,6 +3363,7 @@ function CenterDetail({ center, mixtures, proveniencias, diarias, formulas, avar
         consumiveis,
         logotipo,
         nomeUtilizadorAtual,
+        rececoes,
         onBack: () => setSection(null),
         onAdd: onAddDiaria,
         onEdit: onEditDiaria,
@@ -4931,7 +4932,7 @@ function GraficoProducaoModal({ diarias, center, onClose }) {
     ] })
   ] });
 }
-function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, canManage, podeRegistar, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onOpenDiaria, onOpenResolucao, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, nomeUtilizadorAtual }) {
+function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, canManage, podeRegistar, isAdmin, onBack, onAdd, onEdit, onDelete, onImport, onOpenDiaria, onOpenResolucao, formulas, materiais, equipamentos, maoDeObra, consumiveis, logotipo, nomeUtilizadorAtual, rececoes }) {
   const [searchDate, setSearchDate] = useState("");
   const [mostrarGrafico, setMostrarGrafico] = useState(false);
   const [mostrarExportarMensal, setMostrarExportarMensal] = useState(false);
@@ -5119,6 +5120,18 @@ function ProducaoSection({ center, diarias, avarias, clientes, centrosCusto, can
                 fmt(totalDiaria(d)),
                 " t"
               ] }),
+              /* @__PURE__ */ jsx(
+                "span",
+                {
+                  title: "Exportar PDF",
+                  onClick: (e) => {
+                    e.stopPropagation();
+                    gerarPDFDiaria(d, { clientes, centrosCusto, artigos: formulas, rececoes, materiais, consumiveis, diarias, avarias, center, logotipo, nomeUtilizadorAtual });
+                  },
+                  className: "p-1.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg",
+                  children: /* @__PURE__ */ jsx(FileText, { size: 14 })
+                }
+              ),
               canManage && /* @__PURE__ */ jsx(
                 "span",
                 {
@@ -6939,6 +6952,227 @@ function AssinaturaDisplay({ nome, assinatura, className }) {
   }
   return /* @__PURE__ */ jsx("span", { className: `text-blue-700 ${className || "text-xl"}`, style: { fontFamily: "'Brush Script MT', 'Segoe Script', 'Lucida Handwriting', cursive" }, children: nome || "\u2014" });
 }
+const gerarPDFDiaria = (diaria, { clientes, centrosCusto, artigos, rececoes, materiais, consumiveis, diarias, avarias, users, center, logotipo, nomeUtilizadorAtual }) => {
+  const dataInicio = diaria.dataInicio;
+  const dataFim = diaria.dataFim || diaria.dataInicio;
+  const turno = diaria.turno || (dataFim === dataInicio ? "Diurno" : dataFim > dataInicio ? "Noturno" : "");
+  const linhas = diaria.linhas || [];
+  const totalToneladas = linhas.reduce((s, l) => s + (parseFloat(l.toneladas) || 0), 0);
+  const usaCentroCusto = (clienteId) => isSocorpenaCliente((clientes || []).find((x) => x.id === clienteId));
+  const nomeCliente = (id) => (clientes || []).find((c) => c.id === id)?.designacao || "\u2014";
+  const nomeObra = (id) => {
+    const cc = (centrosCusto || []).find((x) => x.id === id);
+    if (!cc) return "";
+    return cc.codigo ? `${cc.codigo} - ${cc.designacao}` : cc.designacao;
+  };
+  const nomeArtigo = (l) => l.artigoDesignacao || (artigos || []).find((a) => a.id === l.artigoId)?.designacao || "\u2014";
+  const rececoesDoDia = (rececoes || []).filter((r) => r.data && dataInicio && r.data === dataInicio);
+  const nomeProdutoRececao = (r) => {
+    const lista = r.categoria === "consumiveis" ? consumiveis || [] : materiais || [];
+    return lista.find((p) => p.id === r.produtoId)?.designacao || "\u2014";
+  };
+  const fornecedorRececao = (r) => {
+    const lista = r.categoria === "consumiveis" ? consumiveis || [] : materiais || [];
+    return lista.find((p) => p.id === r.produtoId)?.fornecedor || "";
+  };
+  const unidadeRececao = (r) => r.categoria === "consumiveis" ? "L" : "t";
+  const categoriaLabelRececao = { agregados: "Agregado", betumes: "Betume", consumiveis: "Combust\xEDvel" };
+  const historicoDiariaOrdenado = [...diaria.historico || []].sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  const incidenciasList = normalizeIncidencias(diaria.incidencias);
+  const observacoes = diaria.observacoes || "";
+  const pontoMedioAtual = dataOrdenacaoDiaria({ dataInicio, dataFim });
+  const anoRef = dataInicio ? new Date(dataInicio).getFullYear() : (/* @__PURE__ */ new Date()).getFullYear();
+  const acumuladoAnual = (diarias || []).filter((d) => d.id !== diaria.id && d.dataInicio && new Date(d.dataInicio).getFullYear() === anoRef && !isNaN(dataOrdenacaoDiaria(d)) && dataOrdenacaoDiaria(d) <= pontoMedioAtual).reduce((s, d) => s + (d.linhas || []).reduce((s2, l) => s2 + (parseFloat(l.toneladas) || 0), 0), 0) + totalToneladas;
+  const dataReferenciaPendentes = dataInicio || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const diasAberto = (dIni) => Math.max(0, Math.round((new Date(dataReferenciaPendentes) - new Date(dIni)) / 864e5));
+  const pendentes = [
+    ...(diarias || []).filter((d) => d.id !== diaria.id).flatMap((d) => normalizeIncidencias(d.incidencias).filter((inc) => !inc.resolucaoData).map((inc) => ({ data: d.dataInicio, descricao: inc.descricao }))),
+    ...(avarias || []).filter((a) => !a.resolucaoData).map((a) => ({ data: a.data, descricao: a.descricao }))
+  ].sort((x, y) => (x.data || "").localeCompare(y.data || ""));
+  const agora = /* @__PURE__ */ new Date();
+  const rodapeTexto = `Exportado em ${formatDateTimePT(agora.toISOString())} por ${nomeUtilizadorAtual || "\u2014"}`;
+  const nomeCentral = center?.codigo ? `${center.codigo} \u2014 ${center.nome || ""}` : center?.nome || "";
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const margemEsq = 15;
+  const margemDir = 15;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const larguraUtil = pageWidth - margemEsq - margemDir;
+  let y = 15;
+  const alturaCabecalho = 18;
+  const checarQuebraPagina = (alturaNecessaria) => {
+    if (y + alturaNecessaria > pageHeight - 16) {
+      doc.addPage();
+      y = 15;
+    }
+  };
+  const desenharTitulo = (texto) => {
+    checarQuebraPagina(12);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.setTextColor(87, 83, 78);
+    doc.text(texto.toUpperCase(), margemEsq, y);
+    doc.setDrawColor(231, 229, 228);
+    doc.setLineWidth(0.2);
+    doc.line(margemEsq, y + 1.5, pageWidth - margemDir, y + 1.5);
+    y += 7;
+  };
+  if (logotipo) {
+    try {
+      const formatoMatch = /^data:image\/(\w+);/.exec(logotipo);
+      const formato = formatoMatch ? formatoMatch[1].toUpperCase().replace("JPG", "JPEG") : "PNG";
+      const propsImg = doc.getImageProperties(logotipo);
+      const proporcao = propsImg.width && propsImg.height ? propsImg.width / propsImg.height : 3;
+      doc.addImage(logotipo, formato, margemEsq, y, alturaCabecalho * proporcao, alturaCabecalho);
+    } catch {
+    }
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(28, 25, 23);
+  doc.text("Di\xE1ria de Produ\xE7\xE3o", pageWidth - margemDir, y + 4, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(87, 83, 78);
+  doc.text(nomeCentral, pageWidth - margemDir, y + 9.5, { align: "right" });
+  doc.setTextColor(120, 113, 108);
+  doc.text(`${formatDatePT(dataInicio)} \xB7 Turno: ${turno || "\u2014"}`, pageWidth - margemDir, y + 14.5, { align: "right" });
+  y += alturaCabecalho + 3;
+  doc.setDrawColor(214, 211, 209);
+  doc.setLineWidth(0.2);
+  doc.line(margemEsq, y, pageWidth - margemDir, y);
+  y += 6;
+  desenharTitulo("Produ\xE7\xE3o");
+  autoTable(doc, {
+    head: [["Cliente", "Centro de Custo", "Artigo", "Toneladas"]],
+    body: linhas.map((l) => [
+      nomeCliente(l.clienteId),
+      usaCentroCusto(l.clienteId) ? nomeObra(l.centroCustoId) || "\u2014" : "\u2014",
+      nomeArtigo(l),
+      `${parseFloat(l.toneladas || 0).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t`
+    ]),
+    startY: y,
+    margin: { left: margemEsq, right: margemDir, bottom: 16 },
+    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2.2, lineColor: [214, 211, 209], lineWidth: 0.1 },
+    headStyles: { fillColor: [245, 245, 244], textColor: [87, 83, 78], fontStyle: "bold", fontSize: 7.5 },
+    alternateRowStyles: { fillColor: [250, 250, 249] },
+    columnStyles: { 3: { halign: "right" } },
+    foot: [["", "", "Total do dia", `${totalToneladas.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t`]],
+    footStyles: { fillColor: [245, 245, 244], textColor: [28, 25, 23], fontStyle: "bold", fontSize: 8.5, halign: "right" },
+    didDrawPage: () => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(168, 162, 158);
+      doc.text(rodapeTexto, margemEsq, pageHeight - 8);
+    }
+  });
+  y = doc.lastAutoTable.finalY + 5;
+  checarQuebraPagina(6);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(68, 64, 60);
+  doc.text(`Acumulado do ano (${anoRef}): ${acumuladoAnual.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t`, pageWidth - margemDir, y, { align: "right" });
+  y += 9;
+  if (rececoesDoDia.length > 0) {
+    desenharTitulo("Rece\xE7\xE3o de Materiais Constituintes");
+    autoTable(doc, {
+      head: [["Data", "Categoria", "Produto", "Fornecedor", "Quantidade"]],
+      body: rececoesDoDia.map((r) => [
+        formatDatePT(r.data),
+        categoriaLabelRececao[r.categoria] || "\u2014",
+        nomeProdutoRececao(r),
+        fornecedorRececao(r) || "\u2014",
+        `${parseFloat(r.quantidade || 0).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unidadeRececao(r)}`
+      ]),
+      startY: y,
+      margin: { left: margemEsq, right: margemDir, bottom: 16 },
+      styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2.2, lineColor: [214, 211, 209], lineWidth: 0.1 },
+      headStyles: { fillColor: [245, 245, 244], textColor: [87, 83, 78], fontStyle: "bold", fontSize: 7.5 },
+      alternateRowStyles: { fillColor: [250, 250, 249] },
+      columnStyles: { 4: { halign: "right" } },
+      didDrawPage: () => {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(168, 162, 158);
+        doc.text(rodapeTexto, margemEsq, pageHeight - 8);
+      }
+    });
+    y = doc.lastAutoTable.finalY + 9;
+  }
+  const desenharLista = (titulo, itens) => {
+    if (itens.length === 0) return;
+    desenharTitulo(titulo);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(41, 37, 36);
+    itens.forEach((texto) => {
+      const linhasTexto = doc.splitTextToSize(`\u2022  ${texto}`, larguraUtil - 2);
+      checarQuebraPagina(linhasTexto.length * 4.5 + 2);
+      doc.text(linhasTexto, margemEsq, y);
+      y += linhasTexto.length * 4.5 + 1.5;
+    });
+    y += 3;
+  };
+  desenharLista("Incid\xEAncias / Avarias", incidenciasList.filter((i) => i.descricao?.trim()).map(
+    (i) => `${i.descricao}${i.resolucaoData ? ` \u2014 resolvido em ${formatDatePT(i.resolucaoData)}${i.resolucaoDescricao ? `: ${i.resolucaoDescricao}` : ""}` : " (por resolver)"}`
+  ));
+  desenharLista("Pendentes de Resolu\xE7\xE3o", pendentes.map(
+    (p) => `${p.descricao} \u2014 ${diasAberto(p.data)} dia${diasAberto(p.data) !== 1 ? "s" : ""} em aberto (desde ${formatDatePT(p.data)})`
+  ));
+  if (observacoes.trim()) {
+    desenharTitulo("Observa\xE7\xF5es");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(68, 64, 60);
+    const linhasObs = doc.splitTextToSize(observacoes.trim(), larguraUtil);
+    checarQuebraPagina(linhasObs.length * 4.5);
+    doc.text(linhasObs, margemEsq, y);
+    y += linhasObs.length * 4.5 + 5;
+  }
+  if (historicoDiariaOrdenado.length > 0) {
+    desenharTitulo("Assinatura \u2014 Hist\xF3rico de Registos");
+    historicoDiariaOrdenado.forEach((h, i) => {
+      checarQuebraPagina(9);
+      const userDoRegisto = (users || []).find((u) => u.id === h.utilizadorId);
+      const nomeAssinatura = nomeParaAssinatura(userDoRegisto, h.utilizador);
+      const imgAssinatura = userDoRegisto?.assinatura;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(120, 113, 108);
+      doc.text(i === 0 ? "EXECUTADO POR:" : "EDITADO POR:", margemEsq, y + 4);
+      if (imgAssinatura) {
+        try {
+          const formatoMatch = /^data:image\/(\w+);/.exec(imgAssinatura);
+          const formato = formatoMatch ? formatoMatch[1].toUpperCase().replace("JPG", "JPEG") : "PNG";
+          const propsImg = doc.getImageProperties(imgAssinatura);
+          const proporcao = propsImg.width && propsImg.height ? propsImg.width / propsImg.height : 3;
+          doc.addImage(imgAssinatura, formato, margemEsq + 32, y - 1, 9 * proporcao, 9);
+        } catch {
+        }
+      } else {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(11);
+        doc.setTextColor(29, 78, 216);
+        doc.text(nomeAssinatura, margemEsq + 32, y + 4);
+      }
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(120, 113, 108);
+      doc.text(formatDateTimePT(h.data), margemEsq + 80, y + 4);
+      y += 8;
+    });
+  }
+  const totalPaginas = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPaginas; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(168, 162, 158);
+    doc.text(rodapeTexto, margemEsq, pageHeight - 8);
+    doc.text(`P\xE1gina ${i} de ${totalPaginas}`, pageWidth - margemDir, pageHeight - 8, { align: "right" });
+  }
+  doc.save(`diaria-producao-${dataInicio || "sem-data"}.pdf`);
+};
 function DiariaModal({ data, artigos, clientes, centrosCusto, diarias, avarias, rececoes, materiais, consumiveis, center, logotipo, isAdmin, nomeUtilizadorAtual, onDeleteHistorico, onEditHistoricoUtilizador, onEditHistoricoData, users, readOnly, onSave, onClose }) {
   const emptyMistura = () => ({ id: genId(), artigoId: "", toneladas: "" });
   const emptyGrupo = () => ({ id: genId(), clienteId: "", centroCustoId: "", misturas: [emptyMistura()] });
@@ -7060,196 +7294,10 @@ function DiariaModal({ data, artigos, clientes, centrosCusto, diarias, avarias, 
     executarGravacao();
   };
   const exportarPDF = () => {
-    const linhas = linhasFlat;
-    const nomeCliente = (id) => clientes.find((c) => c.id === id)?.designacao || "\u2014";
-    const nomeObra = (id) => {
-      const cc = centrosCusto.find((x) => x.id === id);
-      if (!cc) return "";
-      return cc.codigo ? `${cc.codigo} - ${cc.designacao}` : cc.designacao;
-    };
-    const agora = /* @__PURE__ */ new Date();
-    const rodapeTexto = `Exportado em ${formatDateTimePT(agora.toISOString())} por ${nomeUtilizadorAtual || "\u2014"}`;
-    const nomeCentral = center?.codigo ? `${center.codigo} \u2014 ${center.nome || ""}` : center?.nome || "";
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const margemEsq = 15;
-    const margemDir = 15;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const larguraUtil = pageWidth - margemEsq - margemDir;
-    let y = 15;
-    const alturaCabecalho = 18;
-    const checarQuebraPagina = (alturaNecessaria) => {
-      if (y + alturaNecessaria > pageHeight - 16) {
-        doc.addPage();
-        y = 15;
-      }
-    };
-    const desenharTitulo = (texto) => {
-      checarQuebraPagina(12);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10.5);
-      doc.setTextColor(87, 83, 78);
-      doc.text(texto.toUpperCase(), margemEsq, y);
-      doc.setDrawColor(231, 229, 228);
-      doc.setLineWidth(0.2);
-      doc.line(margemEsq, y + 1.5, pageWidth - margemDir, y + 1.5);
-      y += 7;
-    };
-    if (logotipo) {
-      try {
-        const formatoMatch = /^data:image\/(\w+);/.exec(logotipo);
-        const formato = formatoMatch ? formatoMatch[1].toUpperCase().replace("JPG", "JPEG") : "PNG";
-        const propsImg = doc.getImageProperties(logotipo);
-        const proporcao = propsImg.width && propsImg.height ? propsImg.width / propsImg.height : 3;
-        doc.addImage(logotipo, formato, margemEsq, y, alturaCabecalho * proporcao, alturaCabecalho);
-      } catch {
-      }
-    }
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(28, 25, 23);
-    doc.text("Di\xE1ria de Produ\xE7\xE3o", pageWidth - margemDir, y + 4, { align: "right" });
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(87, 83, 78);
-    doc.text(nomeCentral, pageWidth - margemDir, y + 9.5, { align: "right" });
-    doc.setTextColor(120, 113, 108);
-    doc.text(`${formatDatePT(dataInicio)} \xB7 Turno: ${turno || "\u2014"}`, pageWidth - margemDir, y + 14.5, { align: "right" });
-    y += alturaCabecalho + 3;
-    doc.setDrawColor(214, 211, 209);
-    doc.setLineWidth(0.2);
-    doc.line(margemEsq, y, pageWidth - margemDir, y);
-    y += 6;
-    desenharTitulo("Produ\xE7\xE3o");
-    autoTable(doc, {
-      head: [["Cliente", "Centro de Custo", "Artigo", "Toneladas"]],
-      body: linhas.map((l) => [
-        nomeCliente(l.clienteId),
-        usaCentroCusto(l.clienteId) ? nomeObra(l.centroCustoId) || "\u2014" : "\u2014",
-        artigos.find((a) => a.id === l.artigoId)?.designacao || "\u2014",
-        `${parseFloat(l.toneladas || 0).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t`
-      ]),
-      startY: y,
-      margin: { left: margemEsq, right: margemDir, bottom: 16 },
-      styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2.2, lineColor: [214, 211, 209], lineWidth: 0.1 },
-      headStyles: { fillColor: [245, 245, 244], textColor: [87, 83, 78], fontStyle: "bold", fontSize: 7.5 },
-      alternateRowStyles: { fillColor: [250, 250, 249] },
-      columnStyles: { 3: { halign: "right" } },
-      foot: [["", "", "Total do dia", `${totalToneladas.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t`]],
-      footStyles: { fillColor: [245, 245, 244], textColor: [28, 25, 23], fontStyle: "bold", fontSize: 8.5, halign: "right" },
-      didDrawPage: () => {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(168, 162, 158);
-        doc.text(rodapeTexto, margemEsq, pageHeight - 8);
-      }
-    });
-    y = doc.lastAutoTable.finalY + 5;
-    checarQuebraPagina(6);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(68, 64, 60);
-    doc.text(`Acumulado do ano (${anoRef}): ${acumuladoAnual.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t`, pageWidth - margemDir, y, { align: "right" });
-    y += 9;
-    if (rececoesDoDia.length > 0) {
-      desenharTitulo("Rece\xE7\xE3o de Materiais Constituintes");
-      autoTable(doc, {
-        head: [["Data", "Categoria", "Produto", "Fornecedor", "Quantidade"]],
-        body: rececoesDoDia.map((r) => [
-          formatDatePT(r.data),
-          categoriaLabelRececao[r.categoria] || "\u2014",
-          nomeProdutoRececao(r),
-          fornecedorRececao(r) || "\u2014",
-          `${parseFloat(r.quantidade || 0).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unidadeRececao(r)}`
-        ]),
-        startY: y,
-        margin: { left: margemEsq, right: margemDir, bottom: 16 },
-        styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2.2, lineColor: [214, 211, 209], lineWidth: 0.1 },
-        headStyles: { fillColor: [245, 245, 244], textColor: [87, 83, 78], fontStyle: "bold", fontSize: 7.5 },
-        alternateRowStyles: { fillColor: [250, 250, 249] },
-        columnStyles: { 4: { halign: "right" } },
-        didDrawPage: () => {
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(7);
-          doc.setTextColor(168, 162, 158);
-          doc.text(rodapeTexto, margemEsq, pageHeight - 8);
-        }
-      });
-      y = doc.lastAutoTable.finalY + 9;
-    }
-    const desenharLista = (titulo, itens) => {
-      if (itens.length === 0) return;
-      desenharTitulo(titulo);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(41, 37, 36);
-      itens.forEach((texto) => {
-        const linhasTexto = doc.splitTextToSize(`\u2022  ${texto}`, larguraUtil - 2);
-        checarQuebraPagina(linhasTexto.length * 4.5 + 2);
-        doc.text(linhasTexto, margemEsq, y);
-        y += linhasTexto.length * 4.5 + 1.5;
-      });
-      y += 3;
-    };
-    desenharLista("Incid\xEAncias / Avarias", incidenciasList.filter((i) => i.descricao?.trim()).map(
-      (i) => `${i.descricao}${i.resolucaoData ? ` \u2014 resolvido em ${formatDatePT(i.resolucaoData)}${i.resolucaoDescricao ? `: ${i.resolucaoDescricao}` : ""}` : " (por resolver)"}`
-    ));
-    desenharLista("Pendentes de Resolu\xE7\xE3o", pendentes.map(
-      (p) => `${p.descricao} \u2014 ${diasAberto(p.data)} dia${diasAberto(p.data) !== 1 ? "s" : ""} em aberto (desde ${formatDatePT(p.data)})`
-    ));
-    if (observacoes.trim()) {
-      desenharTitulo("Observa\xE7\xF5es");
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(68, 64, 60);
-      const linhasObs = doc.splitTextToSize(observacoes.trim(), larguraUtil);
-      checarQuebraPagina(linhasObs.length * 4.5);
-      doc.text(linhasObs, margemEsq, y);
-      y += linhasObs.length * 4.5 + 5;
-    }
-    if (historicoDiariaOrdenado.length > 0) {
-      desenharTitulo("Assinatura \u2014 Hist\xF3rico de Registos");
-      historicoDiariaOrdenado.forEach((h, i) => {
-        checarQuebraPagina(9);
-        const userDoRegisto = (users || []).find((u) => u.id === h.utilizadorId);
-        const nomeAssinatura = nomeParaAssinatura(userDoRegisto, h.utilizador);
-        const imgAssinatura = userDoRegisto?.assinatura;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7.5);
-        doc.setTextColor(120, 113, 108);
-        doc.text(i === 0 ? "EXECUTADO POR:" : "EDITADO POR:", margemEsq, y + 4);
-        if (imgAssinatura) {
-          try {
-            const formatoMatch = /^data:image\/(\w+);/.exec(imgAssinatura);
-            const formato = formatoMatch ? formatoMatch[1].toUpperCase().replace("JPG", "JPEG") : "PNG";
-            const propsImg = doc.getImageProperties(imgAssinatura);
-            const proporcao = propsImg.width && propsImg.height ? propsImg.width / propsImg.height : 3;
-            doc.addImage(imgAssinatura, formato, margemEsq + 32, y - 1, 9 * proporcao, 9);
-          } catch {
-          }
-        } else {
-          doc.setFont("helvetica", "italic");
-          doc.setFontSize(11);
-          doc.setTextColor(29, 78, 216);
-          doc.text(nomeAssinatura, margemEsq + 32, y + 4);
-        }
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(120, 113, 108);
-        doc.text(formatDateTimePT(h.data), margemEsq + 80, y + 4);
-        y += 8;
-      });
-    }
-    const totalPaginas = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= totalPaginas; i++) {
-      doc.setPage(i);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      doc.setTextColor(168, 162, 158);
-      doc.text(rodapeTexto, margemEsq, pageHeight - 8);
-      doc.text(`P\xE1gina ${i} de ${totalPaginas}`, pageWidth - margemDir, pageHeight - 8, { align: "right" });
-    }
-    doc.save(`diaria-producao-${dataInicio || "sem-data"}.pdf`);
+    gerarPDFDiaria(
+      { id: data?.id, dataInicio, dataFim, turno, linhas: linhasFlat, incidencias: incidenciasList, observacoes, historico: data?.historico },
+      { clientes, centrosCusto, artigos, rececoes, materiais, consumiveis, diarias, avarias, users, center, logotipo, nomeUtilizadorAtual }
+    );
   };
   return /* @__PURE__ */ jsxs(Modal, { title: data?.id ? readOnly ? "Di\xE1ria de Produ\xE7\xE3o" : "Editar Di\xE1ria de Produ\xE7\xE3o" : "Nova Di\xE1ria de Produ\xE7\xE3o", subtitle: "Di\xE1ria de Produ\xE7\xE3o", onClose, fullscreen: true, children: [
     data?.id && /* @__PURE__ */ jsx("div", { className: "flex justify-end mb-3", children: /* @__PURE__ */ jsxs("button", { onClick: exportarPDF, className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
