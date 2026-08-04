@@ -7869,98 +7869,227 @@ function FichaCustoModal({ formula, center, materiais, equipamentos, maoDeObra, 
   const k = parseFloat(fatorK) || 1;
   const totalComFatorK = Math.round((totalGeral * k + Number.EPSILON) * 100) / 100;
   const exportarFichaCusto = () => {
-    const linhaHtml = (nome, valorTxt, custoTxt, aviso) => `
-      <tr><td>${nome}${aviso ? `<br><span style="font-size:10px;color:#b45309">${aviso}</span>` : ""}</td><td style="text-align:right">${valorTxt}</td><td style="text-align:right; font-weight:bold">${custoTxt}</td></tr>`;
-    const tabelaDiretos = linhasDiretos.map((l) => `
-      <tr>
-        <td>${l.origem}</td><td>${l.designacao}</td>
-        <td style="text-align:right">${l.kgPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align:right">${l.precoUnitario !== null ? l.precoUnitario.toLocaleString("pt-PT", { maximumFractionDigits: 3 }) + " \u20AC" : "sem pre\xE7o"}</td>
-        <td style="text-align:right; font-weight:bold">${l.custo !== null ? l.custo.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20AC" : "\u2014"}</td>
-      </tr>`).join("");
-    const tabelaCombustao = linhasCombustao.map((l) => linhaHtml(l.nome, l.consumo !== null ? `${l.consumo.toLocaleString("pt-PT", { maximumFractionDigits: 3 })} ${l.unidadeConsumo}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
-    const tabelaEquip = linhasEquipamento.map((l) => linhaHtml(l.nome, l.valor !== null ? `${l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
-    const tabelaMaoObra = linhasMaoDeObra.map((l) => linhaHtml(`${l.nome} (qtd. ${l.quantidade ?? "\u2014"})`, l.valorUnitario !== null ? `${l.valorUnitario.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014", l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
-    const tabelaFixos = linhasFixos.map((l) => linhaHtml(l.nome, `${l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/ano`, l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
-    const tabelaVariaveis = linhasVariaveis.map((l) => linhaHtml(l.nome, `${l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${l.unidade}`, l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014", l.aviso)).join("");
-    const html = `<!DOCTYPE html>
-      <html><head><meta charset="utf-8"><title>Ficha de Custo \u2014 ${formula.codigo}</title>
-      <style>
-        body { font-family: 'Arial Narrow', Arial, sans-serif; color: #1c1917; padding: 32px; max-width: 900px; margin: 0 auto; font-size: 13px; }
-        .logo { max-height: 55px; margin-bottom: 16px; }
-        h1 { font-size: 18px; margin-bottom: 2px; }
-        .sub { color: #78716c; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; }
-        h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #57534e; border-bottom: 1px solid #e7e5e4; padding-bottom: 4px; margin-top: 22px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12px; }
-        th, td { border: 1px solid #d6d3d1; padding: 5px 7px; }
-        th { background: #f5f5f4; text-align: left; font-size: 10px; text-transform: uppercase; }
-        .subtotal { text-align: right; font-weight: bold; margin-top: 4px; font-size: 13px; }
-        .totalfinal { margin-top: 24px; padding: 14px 18px; background: #fef3c7; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .totalfinal .label { font-weight: bold; text-transform: uppercase; font-size: 12px; }
-        .totalfinal .valor { font-weight: bold; font-size: 20px; }
-      </style></head>
-      <body>
-        ${logotipo ? `<img class="logo" src="${logotipo}" alt="Log\xF3tipo" />` : ""}
-        <h1>Ficha de Custo</h1>
-        <p class="sub">${formula.codigo} \u2014 ${formula.designacao} \xB7 ${center?.nome || ""}</p>
-        <p style="font-size:12px; color:#44403c;">Custo \xE0 data: <strong>${formatDatePT(dataRef)}</strong> \xB7 Fator K: <strong>${k.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></p>
-
-        <h2>1 \u2014 Custos Diretos (materiais constituintes)</h2>
-        <table>
-          <tr><th>Origem</th><th>Material</th><th style="text-align:right">kg/t</th><th style="text-align:right">Pre\xE7o</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
-          ${tabelaDiretos || '<tr><td colspan="5" style="text-align:center">\u2014</td></tr>'}
-        </table>
-        <p class="subtotal">Subtotal Diretos: ${totalDiretos.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
-
-        <h2>2 \u2014 Bloco T\xE9rmico e Queimador Tambor Secador</h2>
-        <table>
-          <tr><th>Origem</th><th style="text-align:right">Consumo</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
-          ${tabelaCombustao || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
-        </table>
-        <p class="subtotal">Subtotal Bloco T\xE9rmico/Queimador: ${totalCombustao.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
-
-        <h2>3 \u2014 Custo Equipamento</h2>
-        <table>
-          <tr><th>Equipamento</th><th style="text-align:right">Valor</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
-          ${tabelaEquip || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
-        </table>
-        <p class="subtotal">Subtotal Equipamento: ${totalEquipamento.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
-
-        <h2>4 \u2014 M\xE3o de Obra</h2>
-        <table>
-          <tr><th>Categoria</th><th style="text-align:right">Valor</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
-          ${tabelaMaoObra || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
-        </table>
-        <p class="subtotal">Subtotal M\xE3o de Obra: ${totalMaoDeObra.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
-
-        <h2>5 \u2014 Custos Fixos</h2>
-        <table>
-          <tr><th>Custo</th><th style="text-align:right">Valor Anual</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
-          ${tabelaFixos || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
-        </table>
-        <p class="subtotal">Subtotal Custos Fixos: ${totalFixos.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
-
-        <h2>6 \u2014 Custos Vari\xE1veis</h2>
-        <table>
-          <tr><th>Custo</th><th style="text-align:right">Valor</th><th style="text-align:right">Custo (\u20AC/t)</th></tr>
-          ${tabelaVariaveis || '<tr><td colspan="3" style="text-align:center">\u2014</td></tr>'}
-        </table>
-        <p class="subtotal">Subtotal Custos Vari\xE1veis: ${totalVariaveis.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t</p>
-
-        <div class="totalfinal">
-          <span class="label">Total Geral (sem Fator K): ${totalGeral.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t<br>Total Final (com Fator K \xD7 ${k.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
-          <span class="valor">${totalComFatorK.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC / t</span>
-        </div>
-      </body></html>`;
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Ficha_Custo_${formula.codigo}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const agora = /* @__PURE__ */ new Date();
+    const rodapeTexto = `Exportado em ${formatDateTimePT(agora.toISOString())}`;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const margemEsq = 15;
+    const margemDir = 15;
+    const pageWidthTopo = doc.internal.pageSize.getWidth();
+    let y = 15;
+    const alturaCabecalho = 18;
+    if (logotipo) {
+      try {
+        const formatoMatch = /^data:image\/(\w+);/.exec(logotipo);
+        const formato = formatoMatch ? formatoMatch[1].toUpperCase().replace("JPG", "JPEG") : "PNG";
+        const propsImg = doc.getImageProperties(logotipo);
+        const proporcao = propsImg.width && propsImg.height ? propsImg.width / propsImg.height : 3;
+        doc.addImage(logotipo, formato, margemEsq, y, alturaCabecalho * proporcao, alturaCabecalho);
+      } catch {
+      }
+    }
+    const nomeCentral = center?.codigo ? `${center.codigo} \u2014 ${center.nome || ""}` : center?.nome || "";
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(28, 25, 23);
+    doc.text("Ficha de Custo", pageWidthTopo - margemDir, y + 4, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(87, 83, 78);
+    doc.text(`${formula.codigo} \u2014 ${formula.designacao}`, pageWidthTopo - margemDir, y + 9.5, { align: "right" });
+    doc.setTextColor(120, 113, 108);
+    doc.text(`${nomeCentral} \xB7 Data: ${formatDatePT(dataRef)} \xB7 Fator K: ${k.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidthTopo - margemDir, y + 14.5, { align: "right" });
+    y += alturaCabecalho + 3;
+    doc.setDrawColor(214, 211, 209);
+    doc.setLineWidth(0.2);
+    doc.line(margemEsq, y, pageWidthTopo - margemDir, y);
+    y += 6;
+    const checarQuebraPagina = (alturaNecessaria) => {
+      const pageHeight2 = doc.internal.pageSize.getHeight();
+      if (y + alturaNecessaria > pageHeight2 - 20) {
+        doc.addPage();
+        y = 15;
+      }
+    };
+    const desenharTitulo = (texto) => {
+      checarQuebraPagina(12);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(87, 83, 78);
+      doc.text(texto.toUpperCase(), margemEsq, y);
+      doc.setDrawColor(231, 229, 228);
+      doc.setLineWidth(0.2);
+      doc.line(margemEsq, y + 1.5, pageWidthTopo - margemDir, y + 1.5);
+      y += 7;
+    };
+    const desenharSubtotal = (texto, valor) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(68, 64, 60);
+      doc.text(`${texto}: ${valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t`, pageWidthTopo - margemDir, y, { align: "right" });
+      y += 8;
+    };
+    const desenharTabela = (head, body, colunasDireita) => {
+      autoTable(doc, {
+        head: [head],
+        body,
+        startY: y,
+        margin: { left: margemEsq, right: margemEsq, bottom: 20 },
+        styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2, lineColor: [214, 211, 209], lineWidth: 0.1 },
+        headStyles: { fillColor: [245, 245, 244], textColor: [87, 83, 78], fontStyle: "bold", fontSize: 7.5 },
+        alternateRowStyles: { fillColor: [250, 250, 249] },
+        columnStyles: Object.fromEntries(colunasDireita.map((i) => [i, { halign: "right" }])),
+        didDrawPage: () => {
+          const pageHeight2 = doc.internal.pageSize.getHeight();
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7);
+          doc.setTextColor(168, 162, 158);
+          doc.text(rodapeTexto, margemEsq, pageHeight2 - 8);
+        }
+      });
+      y = doc.lastAutoTable.finalY + 5;
+    };
+    desenharTitulo("1 \u2014 Custos Diretos (materiais constituintes)");
+    if (linhasDiretos.length === 0) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(168, 162, 158);
+      doc.text("Esta f\xF3rmula ainda n\xE3o tem componentes com material associado.", margemEsq, y);
+      y += 10;
+    } else {
+      desenharTabela(
+        ["Origem", "Material", "kg/t", "Pre\xE7o", "Custo (\u20AC/t)"],
+        linhasDiretos.map((l) => [
+          l.origem,
+          l.designacao,
+          l.kgPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          l.precoUnitario !== null ? l.precoUnitario.toLocaleString("pt-PT", { maximumFractionDigits: 3 }) + " \u20AC" : "sem pre\xE7o",
+          l.custo !== null ? l.custo.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20AC" : "\u2014"
+        ]),
+        [2, 3, 4]
+      );
+    }
+    desenharSubtotal("Subtotal Diretos", totalDiretos);
+    checarQuebraPagina(20);
+    desenharTitulo("2 \u2014 Bloco T\xE9rmico e Queimador Tambor Secador");
+    if (linhasCombustao.length === 0) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(168, 162, 158);
+      doc.text("Sem combust\xEDvel configurado para o Bloco T\xE9rmico ou o Queimador Tambor Secador.", margemEsq, y);
+      y += 10;
+    } else {
+      desenharTabela(
+        ["Origem", "Consumo", "Custo (\u20AC/t)"],
+        linhasCombustao.map((l) => [
+          l.nome + (l.aviso ? ` (${l.aviso})` : ""),
+          l.consumo !== null ? `${l.consumo.toLocaleString("pt-PT", { maximumFractionDigits: 3 })} ${l.unidadeConsumo}` : "\u2014",
+          l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014"
+        ]),
+        [1, 2]
+      );
+    }
+    desenharSubtotal("Subtotal Bloco T\xE9rmico/Queimador", totalCombustao);
+    checarQuebraPagina(20);
+    desenharTitulo("3 \u2014 Custo Equipamento");
+    if (linhasEquipamento.length === 0) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(168, 162, 158);
+      doc.text("Sem custos de equipamento configurados.", margemEsq, y);
+      y += 10;
+    } else {
+      desenharTabela(
+        ["Equipamento", "Valor", "Custo (\u20AC/t)"],
+        linhasEquipamento.map((l) => [
+          l.nome + (l.aviso ? ` (${l.aviso})` : ""),
+          l.valor !== null ? `${l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014",
+          l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014"
+        ]),
+        [1, 2]
+      );
+    }
+    desenharSubtotal("Subtotal Equipamento", totalEquipamento);
+    checarQuebraPagina(20);
+    desenharTitulo("4 \u2014 M\xE3o de Obra");
+    if (linhasMaoDeObra.length === 0) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(168, 162, 158);
+      doc.text("Sem categorias de m\xE3o de obra atribu\xEDdas a este centro.", margemEsq, y);
+      y += 10;
+    } else {
+      desenharTabela(
+        ["Categoria", "Valor", "Custo (\u20AC/t)"],
+        linhasMaoDeObra.map((l) => [
+          `${l.nome} (qtd. ${l.quantidade ?? "\u2014"})` + (l.aviso ? ` \u2014 ${l.aviso}` : ""),
+          l.valorUnitario !== null ? `${l.valorUnitario.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${l.unidade}` : "\u2014",
+          l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014"
+        ]),
+        [1, 2]
+      );
+    }
+    desenharSubtotal("Subtotal M\xE3o de Obra", totalMaoDeObra);
+    checarQuebraPagina(20);
+    desenharTitulo("5 \u2014 Custos Fixos");
+    if (linhasFixos.length === 0) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(168, 162, 158);
+      doc.text("Sem custos fixos com valor registado para esta data.", margemEsq, y);
+      y += 10;
+    } else {
+      desenharTabela(
+        ["Custo", "Valor Anual", "Custo (\u20AC/t)"],
+        linhasFixos.map((l) => [
+          l.nome + (l.aviso ? ` (${l.aviso})` : ""),
+          `${l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/ano`,
+          l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014"
+        ]),
+        [1, 2]
+      );
+    }
+    desenharSubtotal("Subtotal Custos Fixos", totalFixos);
+    checarQuebraPagina(20);
+    desenharTitulo("6 \u2014 Custos Vari\xE1veis");
+    if (linhasVariaveis.length === 0) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(168, 162, 158);
+      doc.text("Sem custos vari\xE1veis registados.", margemEsq, y);
+      y += 10;
+    } else {
+      desenharTabela(
+        ["Custo", "Valor", "Custo (\u20AC/t)"],
+        linhasVariaveis.map((l) => [
+          l.nome + (l.aviso ? ` (${l.aviso})` : ""),
+          `${l.valor.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${l.unidade}`,
+          l.custoPorTonelada !== null ? `${l.custoPorTonelada.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC` : "\u2014"
+        ]),
+        [1, 2]
+      );
+    }
+    desenharSubtotal("Subtotal Custos Vari\xE1veis", totalVariaveis);
+    checarQuebraPagina(26);
+    doc.setFillColor(254, 243, 199);
+    doc.roundedRect(margemEsq, y, pageWidthTopo - margemEsq - margemDir, 18, 2, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(120, 72, 8);
+    doc.text(`TOTAL GERAL (sem Fator K): ${totalGeral.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC/t`, margemEsq + 5, y + 7);
+    doc.text(`TOTAL FINAL (com Fator K \xD7 ${k.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`, margemEsq + 5, y + 13.5);
+    doc.setFontSize(15);
+    doc.text(`${totalComFatorK.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC / t`, pageWidthTopo - margemDir - 5, y + 12, { align: "right" });
+    const totalPaginas = doc.internal.getNumberOfPages();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    for (let i = 1; i <= totalPaginas; i++) {
+      doc.setPage(i);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(168, 162, 158);
+      doc.text(`P\xE1gina ${i} de ${totalPaginas}`, pageWidth - margemEsq, pageHeight - 8, { align: "right" });
+    }
+    doc.save(`Ficha_Custo_${formula.codigo}.pdf`);
   };
   return /* @__PURE__ */ jsxs(Modal, { title: "Ficha de Custo", subtitle: `${formula.codigo} \u2014 ${formula.designacao}`, onClose, wide: true, children: [
     /* @__PURE__ */ jsx("div", { className: "flex justify-end mb-3", children: /* @__PURE__ */ jsxs("button", { onClick: exportarFichaCusto, className: "flex items-center gap-1.5 px-3.5 py-2 bg-white border border-stone-300 text-stone-700 rounded-lg text-sm font-semibold hover:bg-stone-50", children: [
@@ -8219,137 +8348,135 @@ function DopFormulaModal({ formula, center, dopConfig, logotipo, isAdmin, nomeUt
     const { codigoDop: codigoDop2, norma: norma2, utilizacaoPrevista: utilizacaoPrevista2, porosidadeVmax: porosidadeVmax2, porosidadeVmin: porosidadeVmin2, itsr: itsr2, temperatura: temperatura2, granulometria: granulometria2, ligante: ligante2, defTaxaDnd: defTaxaDnd2, defTaxa: defTaxa2, defProfDnd: defProfDnd2, defProf: defProf2 } = campos;
     const hoje = /* @__PURE__ */ new Date();
     const dataEmissao = hoje.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" });
-    const linhasGranulometria = PENEIROS_DOP.map((p) => {
+    const linhasGranulometriaBody = PENEIROS_DOP.map((p) => {
       const g = granulometria2[p] || {};
-      if (!g.li && !g.valor && !g.ls && !g.tolInf && !g.tolSup) return "";
-      return `
-        <tr>
-          <td>${g.tolInf || ""}</td><td>${g.tolSup || ""}</td>
-          <td style="text-align:center">${p} mm</td>
-          <td style="text-align:center">${g.li || ""}</td>
-          <td style="text-align:center; font-weight:bold">${g.valor || ""}</td>
-          <td style="text-align:center">${g.ls || ""}</td>
-        </tr>`;
-    }).join("");
-    const html = `<!DOCTYPE html>
-      <html><head><meta charset="utf-8"><title>DoP \u2014 ${formula.codigo}</title>
-      <style>
-        body { font-family: 'Arial Narrow', Arial, sans-serif; color: #1c1917; padding: 32px; max-width: 900px; margin: 0 auto; font-size: 13px; }
-        .logo { max-height: 55px; margin-bottom: 16px; }
-        h1 { font-size: 17px; text-align: center; margin-bottom: 24px; text-transform: uppercase; }
-        .num { font-weight: bold; }
-        .bloco { margin-bottom: 16px; }
-        .titulo { font-weight: bold; text-transform: uppercase; margin-bottom: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 6px; margin-bottom: 10px; }
-        th, td { border: 1px solid #78716c; padding: 4px 6px; font-size: 12px; }
-        th { background: #f5f5f4; }
-        .semlinhas td, .semlinhas th { border: none; padding: 2px 4px; }
-        .assinatura { margin-top: 40px; }
-      </style></head>
-      <body>
-        ${logotipo ? `<img class="logo" src="${logotipo}" alt="Log\xF3tipo" />` : ""}
-        <h1>Declara\xE7\xE3o de Desempenho</h1>
-
-        <div class="bloco">
-          <p class="titulo"><span class="num">1-</span> C\xF3digo de identifica\xE7\xE3o \xFAnico do produto-tipo:</p>
-          <p>${formula.codigo} - ${formula.designacao}</p>
-          <p>${codigoDop2}</p>
-        </div>
-
-        <div class="bloco">
-          <p class="titulo"><span class="num">2-</span> Utiliza\xE7\xE3o(\xF5es) prevista(as):</p>
-          <p>${utilizacaoPrevista2}</p>
-        </div>
-
-        <div class="bloco">
-          <p class="titulo"><span class="num">3-</span> Fabricante:</p>
-          <p>${cfg.fabricanteNome || ""}<br>${(cfg.fabricanteMorada || "").replace(/\n/g, "<br>")}<br>Centro de Produ\xE7\xE3o: ${center?.codigo || ""} - ${center?.nome || ""}</p>
-        </div>
-
-        <div class="bloco">
-          <p class="titulo"><span class="num">4-</span> Mandat\xE1rio:</p>
-          <p>${cfg.mandatario || "N\xE3o aplic\xE1vel."}</p>
-        </div>
-
-        <div class="bloco">
-          <p class="titulo"><span class="num">5-</span> Sistema de Avalia\xE7\xE3o e Verifica\xE7\xE3o da Regularidade do Desempenho (AVCP):</p>
-          <p>${cfg.avcp || ""}</p>
-        </div>
-
-        <div class="bloco">
-          <p class="titulo"><span class="num">6A-</span> Norma Harmonizada:</p>
-          <p>${norma2}</p>
-          <p class="titulo" style="margin-top:8px">Organismo(s) Notificado(s):</p>
-          <p>${(cfg.organismoNotificado || "").replace(/\n/g, "<br>")}</p>
-        </div>
-
-        <div class="bloco">
-          <p class="titulo"><span class="num">6B-</span> Documento de Avalia\xE7\xE3o Europeu:</p>
-          <p>${cfg.documentoAvaliacaoEuropeu || "N\xE3o aplic\xE1vel."}</p>
-          <p class="titulo" style="margin-top:8px">Avalia\xE7\xE3o T\xE9cnica Europeia:</p>
-          <p>${cfg.avaliacaoTecnicaEuropeia || "N\xE3o aplic\xE1vel."}</p>
-        </div>
-
-        <div class="bloco">
-          <p class="titulo"><span class="num">7-</span> Desempenho Declarado:</p>
-
-          <p style="margin-top:10px"><strong>Porosidade</strong> (compacta\xE7\xE3o dos provetes de ensaio conforme refer\xEAncia C.1.3 da EN 13108-20):</p>
-          <table class="semlinhas">
-            <tr><td>M\xE1xima</td><td style="text-align:right">Vm\xE1x ${porosidadeVmax2} (${porosidadeVmax2}%)</td></tr>
-            <tr><td>M\xEDnima</td><td style="text-align:right">Vmin ${porosidadeVmin2} (${porosidadeVmin2}%)</td></tr>
-          </table>
-
-          <p><strong>Sensibilidade \xE0 \xE1gua</strong> (conforme EN 12697-12): <strong>ITSR ${itsr2} %</strong></p>
-          <p><strong>Temperatura da mistura:</strong> ${temperatura2}</p>
-
-          <p style="margin-top:10px"><strong>Granulometria</strong> (% de material passado) \u2014 Peneiros (s\xE9rie base + s\xE9rie 2):</p>
-          <table>
-            <tr><th colspan="2">Toler\xE2ncias (%)</th><th>Peneiro</th><th>LI</th><th>%</th><th>LS</th></tr>
-            ${linhasGranulometria || '<tr><td colspan="6" style="text-align:center">\u2014</td></tr>'}
-          </table>
-
-          <table class="semlinhas">
-            <tr><td><strong>Percentagem de ligante</strong></td>
-              <td>Tol. ${ligante2.tolInf || ""}/${ligante2.tolSup || ""}</td>
-              <td>Bmin ${ligante2.bmin || ""}</td>
-              <td style="text-align:right">LI ${ligante2.li || ""} \u2014 <strong>${ligante2.valor || ""}</strong> \u2014 LS ${ligante2.ls || ""}</td>
-            </tr>
-          </table>
-
-          <p style="margin-top:10px"><strong>Resist\xEAncia \xE0 deforma\xE7\xE3o permanente</strong> (refer\xEAncia D.1.6 da EN 13108-20):</p>
-          <table class="semlinhas">
-            <tr><td>Taxa de deforma\xE7\xE3o (WTSAIR)</td><td style="text-align:right">${defTaxaDnd2 ? "DND" : defTaxa2}</td></tr>
-            <tr><td>Profundidade de rodeira m\xE1xima (PRDAIR)</td><td style="text-align:right">${defProfDnd2 ? "DND" : defProf2}</td></tr>
-          </table>
-          <p style="font-size:11px; color:#78716c">DND - Desempenho N\xE3o Declarado</p>
-        </div>
-
-        <div class="bloco">
-          <p class="titulo"><span class="num">8-</span> Documenta\xE7\xE3o T\xE9cnica Adequada e/ou Documenta\xE7\xE3o T\xE9cnica Espec\xEDfica:</p>
-          <p>O desempenho do produto identificado acima est\xE1 em conformidade com o conjunto de desempenhos declarados.<br>
-          A presente declara\xE7\xE3o de desempenho \xE9 emitida em conformidade com as disposi\xE7\xF5es europeias, sob a exclusiva responsabilidade do fabricante identificado acima.</p>
-        </div>
-
-        <div class="assinatura">
-          <p>${cfg.localEmissao || ""}, ${dataEmissao}</p>
-          <table class="semlinhas" style="margin-top:30px"><tr>
-            <td style="width:60%"></td>
-            <td style="text-align:center">
-              <p>${cfg.signatarioNome || ""}</p>
-              <p style="font-size:11px">${cfg.signatarioCargo || ""}</p>
-            </td>
-          </tr></table>
-        </div>
-      </body></html>`;
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `DoP_${formula.codigo}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      if (!g.li && !g.valor && !g.ls && !g.tolInf && !g.tolSup) return null;
+      return [g.tolInf || "", g.tolSup || "", `${p} mm`, g.li || "", g.valor || "", g.ls || ""];
+    }).filter(Boolean);
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const margemEsq = 18;
+    const margemDir = 18;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const larguraUtil = pageWidth - margemEsq - margemDir;
+    let y = 15;
+    const checarQuebraPagina = (alturaNecessaria) => {
+      const pageHeight2 = doc.internal.pageSize.getHeight();
+      if (y + alturaNecessaria > pageHeight2 - 18) {
+        doc.addPage();
+        y = 15;
+      }
+    };
+    const escreverParagrafo = (texto, { bold = false, size = 9.5, cor = [28, 25, 23], espacoDepois = 5 } = {}) => {
+      if (!texto) return;
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFontSize(size);
+      doc.setTextColor(...cor);
+      const linhas = doc.splitTextToSize(String(texto), larguraUtil);
+      checarQuebraPagina(linhas.length * (size * 0.42) + 2);
+      doc.text(linhas, margemEsq, y);
+      y += linhas.length * (size * 0.42) + espacoDepois;
+    };
+    const escreverTitulo = (texto) => {
+      checarQuebraPagina(9);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(87, 83, 78);
+      doc.text(texto.toUpperCase(), margemEsq, y);
+      y += 5.5;
+    };
+    if (logotipo) {
+      try {
+        const formatoMatch = /^data:image\/(\w+);/.exec(logotipo);
+        const formato = formatoMatch ? formatoMatch[1].toUpperCase().replace("JPG", "JPEG") : "PNG";
+        const propsImg = doc.getImageProperties(logotipo);
+        const proporcao = propsImg.width && propsImg.height ? propsImg.width / propsImg.height : 3;
+        doc.addImage(logotipo, formato, margemEsq, y, 16 * proporcao, 16);
+        y += 20;
+      } catch {
+      }
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(28, 25, 23);
+    doc.text("DECLARA\xC7\xC3O DE DESEMPENHO", pageWidth / 2, y, { align: "center" });
+    y += 9;
+    escreverTitulo("1 - C\xF3digo de identifica\xE7\xE3o \xFAnico do produto-tipo:");
+    escreverParagrafo(`${formula.codigo} - ${formula.designacao}`);
+    escreverParagrafo(codigoDop2);
+    escreverTitulo("2 - Utiliza\xE7\xE3o(\xF5es) prevista(as):");
+    escreverParagrafo(utilizacaoPrevista2);
+    escreverTitulo("3 - Fabricante:");
+    escreverParagrafo(cfg.fabricanteNome || "");
+    escreverParagrafo(cfg.fabricanteMorada || "");
+    escreverParagrafo(`Centro de Produ\xE7\xE3o: ${center?.codigo || ""} - ${center?.nome || ""}`);
+    escreverTitulo("4 - Mandat\xE1rio:");
+    escreverParagrafo(cfg.mandatario || "N\xE3o aplic\xE1vel.");
+    escreverTitulo("5 - Sistema de Avalia\xE7\xE3o e Verifica\xE7\xE3o da Regularidade do Desempenho (AVCP):");
+    escreverParagrafo(cfg.avcp || "");
+    escreverTitulo("6A - Norma Harmonizada:");
+    escreverParagrafo(norma2);
+    escreverParagrafo("Organismo(s) Notificado(s):", { bold: true, espacoDepois: 2 });
+    escreverParagrafo(cfg.organismoNotificado || "");
+    escreverTitulo("6B - Documento de Avalia\xE7\xE3o Europeu:");
+    escreverParagrafo(cfg.documentoAvaliacaoEuropeu || "N\xE3o aplic\xE1vel.");
+    escreverParagrafo("Avalia\xE7\xE3o T\xE9cnica Europeia:", { bold: true, espacoDepois: 2 });
+    escreverParagrafo(cfg.avaliacaoTecnicaEuropeia || "N\xE3o aplic\xE1vel.");
+    escreverTitulo("7 - Desempenho Declarado:");
+    escreverParagrafo("Porosidade (compacta\xE7\xE3o dos provetes de ensaio conforme refer\xEAncia C.1.3 da EN 13108-20):", { bold: true, espacoDepois: 2 });
+    escreverParagrafo(`M\xE1xima: Vm\xE1x ${porosidadeVmax2} (${porosidadeVmax2}%)     M\xEDnima: Vmin ${porosidadeVmin2} (${porosidadeVmin2}%)`);
+    escreverParagrafo(`Sensibilidade \xE0 \xE1gua (EN 12697-12): ITSR ${itsr2} %`);
+    escreverParagrafo(`Temperatura da mistura: ${temperatura2}`);
+    escreverParagrafo("Granulometria (% de material passado) \u2014 Peneiros (s\xE9rie base + s\xE9rie 2):", { bold: true, espacoDepois: 2 });
+    if (linhasGranulometriaBody.length > 0) {
+      checarQuebraPagina(20);
+      autoTable(doc, {
+        head: [["Tol. Inf. (%)", "Tol. Sup. (%)", "Peneiro", "LI", "%", "LS"]],
+        body: linhasGranulometriaBody,
+        startY: y,
+        margin: { left: margemEsq, right: margemDir, bottom: 18 },
+        styles: { font: "helvetica", fontSize: 8, cellPadding: 1.6, lineColor: [168, 162, 158], lineWidth: 0.1, halign: "center" },
+        headStyles: { fillColor: [245, 245, 244], textColor: [87, 83, 78], fontStyle: "bold", fontSize: 7.5 }
+      });
+      y = doc.lastAutoTable.finalY + 5;
+    } else {
+      escreverParagrafo("\u2014");
+    }
+    checarQuebraPagina(10);
+    escreverParagrafo(`Percentagem de ligante \u2014 Tol. ${ligante2.tolInf || ""}/${ligante2.tolSup || ""}   Bmin ${ligante2.bmin || ""}   LI ${ligante2.li || ""} \u2014 ${ligante2.valor || ""} \u2014 LS ${ligante2.ls || ""}`, { bold: true });
+    escreverParagrafo("Resist\xEAncia \xE0 deforma\xE7\xE3o permanente (refer\xEAncia D.1.6 da EN 13108-20):", { bold: true, espacoDepois: 2 });
+    escreverParagrafo(`Taxa de deforma\xE7\xE3o (WTSAIR): ${defTaxaDnd2 ? "DND" : defTaxa2}`);
+    escreverParagrafo(`Profundidade de rodeira m\xE1xima (PRDAIR): ${defProfDnd2 ? "DND" : defProf2}`);
+    escreverParagrafo("DND - Desempenho N\xE3o Declarado", { size: 8, cor: [120, 113, 108] });
+    escreverTitulo("8 - Documenta\xE7\xE3o T\xE9cnica Adequada e/ou Documenta\xE7\xE3o T\xE9cnica Espec\xEDfica:");
+    escreverParagrafo("O desempenho do produto identificado acima est\xE1 em conformidade com o conjunto de desempenhos declarados.");
+    escreverParagrafo("A presente declara\xE7\xE3o de desempenho \xE9 emitida em conformidade com as disposi\xE7\xF5es europeias, sob a exclusiva responsabilidade do fabricante identificado acima.");
+    checarQuebraPagina(35);
+    y += 6;
+    escreverParagrafo(`${cfg.localEmissao || ""}, ${dataEmissao}`);
+    y += 20;
+    doc.setDrawColor(168, 162, 158);
+    doc.setLineWidth(0.2);
+    const assinaturaX = pageWidth - margemDir - 70;
+    doc.line(assinaturaX, y, pageWidth - margemDir, y);
+    y += 4;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(28, 25, 23);
+    doc.text(cfg.signatarioNome || "", assinaturaX + 35, y, { align: "center" });
+    y += 4;
+    doc.setFontSize(8);
+    doc.setTextColor(120, 113, 108);
+    doc.text(cfg.signatarioCargo || "", assinaturaX + 35, y, { align: "center" });
+    const totalPaginas = doc.internal.getNumberOfPages();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    for (let i = 1; i <= totalPaginas; i++) {
+      doc.setPage(i);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(168, 162, 158);
+      doc.text(`P\xE1gina ${i} de ${totalPaginas}`, pageWidth - margemDir, pageHeight - 8, { align: "right" });
+    }
+    doc.save(`DoP_${formula.codigo}.pdf`);
   };
   const inputSm = "w-full px-2 py-1 rounded border border-stone-300 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500";
   return /* @__PURE__ */ jsxs(Modal, { title: "Declara\xE7\xE3o de Desempenho (DoP)", subtitle: `${formula.codigo} \u2014 ${formula.designacao}`, onClose, fullscreen: true, children: [
