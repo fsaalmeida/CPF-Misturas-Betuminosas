@@ -436,8 +436,21 @@ function App() {
   const [modal, setModal] = useState(null);
   const [saveError, setSaveError] = useState("");
   const writeQueueRef = useRef({});
+  const pendingWritesRef = useRef(0);
+  const [pendingWrites, setPendingWrites] = useState(0);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const askConfirm = (message, onConfirm) => setConfirmDialog({ message, onConfirm });
+  useEffect(() => {
+    const handler = (e) => {
+      if (pendingWritesRef.current > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+        return "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -543,11 +556,16 @@ function App() {
   }, [users, loading, currentUser]);
   const persist = (key, value, setter) => {
     setter(value);
+    pendingWritesRef.current += 1;
+    setPendingWrites(pendingWritesRef.current);
     const anterior = writeQueueRef.current[key] || Promise.resolve();
     const atual = anterior.catch(() => {
     }).then(() => window.storage.set(key, JSON.stringify(value), true)).catch((e) => {
       setSaveError("N\xE3o foi poss\xEDvel guardar. Tente novamente.");
       console.error(e);
+    }).finally(() => {
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+      setPendingWrites(pendingWritesRef.current);
     });
     writeQueueRef.current[key] = atual;
     return atual;
@@ -1584,11 +1602,16 @@ function App() {
     setModal(null);
   };
   const persistRaw = (key, value) => {
+    pendingWritesRef.current += 1;
+    setPendingWrites(pendingWritesRef.current);
     const anterior = writeQueueRef.current[key] || Promise.resolve();
     const atual = anterior.catch(() => {
     }).then(() => window.storage.set(key, JSON.stringify(value), true)).catch((e) => {
       setSaveError("N\xE3o foi poss\xEDvel guardar. Tente novamente.");
       console.error(e);
+    }).finally(() => {
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+      setPendingWrites(pendingWritesRef.current);
     });
     writeQueueRef.current[key] = atual;
     return atual;
@@ -1888,6 +1911,10 @@ function App() {
     ] }),
     /* @__PURE__ */ jsxs("main", { className: "flex-1 overflow-y-auto", children: [
       saveError && /* @__PURE__ */ jsx("div", { className: "bg-red-50 border-b border-red-200 text-red-700 text-sm px-6 py-2", children: saveError }),
+      pendingWrites > 0 && /* @__PURE__ */ jsxs("div", { className: "fixed bottom-4 right-4 z-50 flex items-center gap-2 bg-stone-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-lg", children: [
+        /* @__PURE__ */ jsx("span", { className: "w-2 h-2 rounded-full bg-amber-400 animate-pulse" }),
+        "A guardar\u2026 n\xE3o feche nem atualize a p\xE1gina"
+      ] }),
       view === "users" && canManageArticles && /* @__PURE__ */ jsx(
         UsersView,
         {
