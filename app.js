@@ -4376,6 +4376,8 @@ function HistoricoQuantidadeMaoObraModal({ nomeCategoria, historico, isAdmin, on
   ] });
 }
 function IncidenciasSection({ center, diarias, avarias, canManage, isAdmin, onBack, onAdd, onEdit, onDelete, onOpenDiaria, onOpenResolucao, onEditIncidenciaDiaria, onDeleteIncidenciaDiaria }) {
+  const [query, setQuery] = useState("");
+  const [filtro, setFiltro] = useState("pendentes");
   const fmtDate = (iso) => iso ? formatDatePT(iso) : "\u2014";
   const daDiaria = diarias.flatMap((d) => normalizeIncidencias(d.incidencias).map((inc) => ({
     key: `diaria-${d.id}-${inc.id}`,
@@ -4401,9 +4403,11 @@ function IncidenciasSection({ center, diarias, avarias, canManage, isAdmin, onBa
     resolucaoData: a.resolucaoData,
     resolucaoDescricao: a.resolucaoDescricao
   }));
-  const combinadas = [...daDiaria, ...manuais].sort((x, y) => (y.data || "").localeCompare(x.data || ""));
+  const combinadasTodas = [...daDiaria, ...manuais].sort((x, y) => (y.data || "").localeCompare(x.data || ""));
   const diasEntre = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5);
   const diasEmEspera = (dataReportada) => Math.max(0, diasEntre(dataReportada, (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)));
+  const porEstado = filtro === "pendentes" ? combinadasTodas.filter((item) => !item.resolucaoData) : combinadasTodas;
+  const combinadas = query ? porEstado.filter((item) => matchesSearch(query, item.descricao, item.resolucaoDescricao, item.origem)) : porEstado;
   return /* @__PURE__ */ jsxs("div", { className: "p-8 max-w-4xl", children: [
     /* @__PURE__ */ jsxs("button", { onClick: onBack, className: "flex items-center gap-1 text-sm text-stone-500 hover:text-amber-600 mb-6 font-medium", children: [
       /* @__PURE__ */ jsx(ChevronLeft, { size: 16 }),
@@ -4423,9 +4427,19 @@ function IncidenciasSection({ center, diarias, avarias, canManage, isAdmin, onBa
         " Nova Incid\xEAncia"
       ] })
     ] }),
+    /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-3 mb-5", children: [
+      /* @__PURE__ */ jsxs("div", { className: "relative flex-1 min-w-[200px]", children: [
+        /* @__PURE__ */ jsx(Search, { size: 15, className: "absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" }),
+        /* @__PURE__ */ jsx("input", { type: "text", value: query, onChange: (e) => setQuery(e.target.value), placeholder: "Pesquisar\u2026", className: "w-full pl-9 pr-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex bg-stone-100 rounded-lg p-0.5 shrink-0", children: [
+        /* @__PURE__ */ jsx("button", { onClick: () => setFiltro("pendentes"), className: `px-3 py-1.5 rounded-md text-xs font-semibold transition ${filtro === "pendentes" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-700"}`, children: "Pendentes" }),
+        /* @__PURE__ */ jsx("button", { onClick: () => setFiltro("todas"), className: `px-3 py-1.5 rounded-md text-xs font-semibold transition ${filtro === "todas" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-700"}`, children: "Todas" })
+      ] })
+    ] }),
     combinadas.length === 0 ? /* @__PURE__ */ jsxs("div", { className: "bg-white border border-dashed border-stone-300 rounded-xl p-10 text-center", children: [
       /* @__PURE__ */ jsx(AlertTriangle, { className: "mx-auto text-stone-300 mb-3", size: 30 }),
-      /* @__PURE__ */ jsx("p", { className: "text-stone-500 text-sm", children: "Ainda n\xE3o h\xE1 incid\xEAncias ou avarias registadas neste centro." })
+      /* @__PURE__ */ jsx("p", { className: "text-stone-500 text-sm", children: combinadasTodas.length === 0 ? "Ainda n\xE3o h\xE1 incid\xEAncias ou avarias registadas neste centro." : "Nenhum resultado para os filtros atuais." })
     ] }) : /* @__PURE__ */ jsx("div", { className: "space-y-3", children: combinadas.map((item) => {
       const resolvida = !!item.resolucaoData;
       const dias = resolvida && item.data ? diasEntre(item.data, item.resolucaoData) : null;
@@ -4727,7 +4741,7 @@ function ExportarProducaoMensalModal({ center, diarias, clientes, centrosCusto, 
     const agora = /* @__PURE__ */ new Date();
     const rodapeTexto = `Exportado em ${formatDateTimePT(agora.toISOString())} por ${nomeUtilizadorAtual || "\u2014"}`;
     const nomeCentral = center?.codigo ? `${center.codigo} \u2014 ${center.nome || ""}` : center?.nome || "";
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     const margemEsq = 15;
     const margemDir = 15;
     const pageWidthTopo = doc.internal.pageSize.getWidth();
