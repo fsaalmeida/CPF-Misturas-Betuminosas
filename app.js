@@ -715,6 +715,13 @@ function App() {
     });
     setModal(null);
   };
+  const linkAuthAccount = (userId, authUid) => {
+    setUsers((prev) => {
+      const atualizado = prev.map((u) => u.id === userId ? { ...u, authUid } : u);
+      persistRaw("users", atualizado);
+      return atualizado;
+    });
+  };
   const deleteUser = (id) => {
     const admins = users.filter((u) => u.role === "Administrador");
     const target = users.find((u) => u.id === id);
@@ -2179,7 +2186,7 @@ function App() {
         }
       )
     ] }),
-    modal?.type === "user" && /* @__PURE__ */ jsx(UserModal, { data: modal.data, centers, isAdmin, currentUserRole: currentUser?.role, perfisPersonalizados, onSave: saveUser, onResetPin: resetUserPin, onSetPin: setUserPin, onClose: () => setModal(null) }),
+    modal?.type === "user" && /* @__PURE__ */ jsx(UserModal, { data: modal.data, centers, isAdmin, currentUserRole: currentUser?.role, perfisPersonalizados, onSave: saveUser, onResetPin: resetUserPin, onSetPin: setUserPin, onLinkAuthAccount: linkAuthAccount, onClose: () => setModal(null) }),
     modal?.type === "logotipo" && /* @__PURE__ */ jsx(LogotipoModal, { logotipoAtual: logotipo, onSave: saveLogotipo, onRemove: removeLogotipo, onClose: () => setModal(null) }),
     modal?.type === "dopConfig" && /* @__PURE__ */ jsx(DopConfigModal, { dopConfig, onSave: saveDopConfig, onClose: () => setModal(null) }),
     modal?.type === "backup" && /* @__PURE__ */ jsx(BackupModal, { onExport: exportarBackupCompleto, onImport: importarBackupCompleto, onClose: () => setModal(null) }),
@@ -5777,7 +5784,7 @@ function DopConfigModal({ dopConfig, onSave, onClose }) {
     /* @__PURE__ */ jsx("button", { onClick: submit, className: "w-full py-3 rounded-lg bg-amber-600 text-white font-display font-semibold tracking-wide uppercase text-sm hover:bg-amber-700", children: "Guardar" })
   ] });
 }
-function UserModal({ data, centers, isAdmin, currentUserRole, perfisPersonalizados, onSave, onResetPin, onSetPin, onClose }) {
+function UserModal({ data, centers, isAdmin, currentUserRole, perfisPersonalizados, onSave, onResetPin, onSetPin, onLinkAuthAccount, onClose }) {
   const [nome, setNome] = useState(data?.nome || "");
   const [primeiroNome, setPrimeiroNome] = useState(data?.primeiroNome || "");
   const [ultimoNome, setUltimoNome] = useState(data?.ultimoNome || "");
@@ -5791,6 +5798,31 @@ function UserModal({ data, centers, isAdmin, currentUserRole, perfisPersonalizad
   const [error, setError] = useState("");
   const [novoPin, setNovoPin] = useState("");
   const [pinDefinido, setPinDefinido] = useState(false);
+  const [passwordAcesso, setPasswordAcesso] = useState("");
+  const [criandoAcesso, setCriandoAcesso] = useState(false);
+  const [erroAcesso, setErroAcesso] = useState("");
+  const [acessoCriado, setAcessoCriado] = useState(false);
+  const criarAcesso = async () => {
+    setErroAcesso("");
+    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) return setErroAcesso("Indique um email v\xE1lido antes de criar o acesso.");
+    if (passwordAcesso.length < 6) return setErroAcesso("A palavra-passe deve ter pelo menos 6 caracteres.");
+    setCriandoAcesso(true);
+    try {
+      const { uid } = await window.firebaseAuth.criarUtilizador(email.trim(), passwordAcesso);
+      onLinkAuthAccount(data.id, uid);
+      setAcessoCriado(true);
+      setPasswordAcesso("");
+    } catch (e) {
+      const mensagens = {
+        "auth/email-already-in-use": "J\xE1 existe uma conta com este email.",
+        "auth/invalid-email": "Este email n\xE3o \xE9 v\xE1lido.",
+        "auth/weak-password": "Palavra-passe demasiado simples \u2014 use pelo menos 6 caracteres."
+      };
+      setErroAcesso(mensagens[e.code] || "N\xE3o foi poss\xEDvel criar o acesso. Tente novamente.");
+    } finally {
+      setCriandoAcesso(false);
+    }
+  };
   const fileInputRef = useRef(null);
   const soCalendario = !isAdmin && currentUserRole === "Gestor" && data?.role === "Operador";
   const submitNovoPin = () => {
@@ -5940,6 +5972,35 @@ function UserModal({ data, centers, isAdmin, currentUserRole, perfisPersonalizad
         /* @__PURE__ */ jsx("button", { onClick: submitNovoPin, className: "mb-4 px-4 py-2.5 rounded-lg bg-stone-800 text-white text-sm font-semibold hover:bg-stone-900 shrink-0", children: pinDefinido ? "Definida \u2713" : "Definir" })
       ] }),
       /* @__PURE__ */ jsx("button", { onClick: () => onResetPin(data.id), className: "w-full py-2.5 rounded-lg border border-stone-300 text-stone-600 font-display font-semibold tracking-wide uppercase text-xs hover:bg-stone-50", children: "Repor palavra-passe (obriga a definir uma nova no pr\xF3ximo acesso)" })
+    ] }),
+    data?.id && isAdmin && /* @__PURE__ */ jsxs("div", { className: "mt-3 pt-3 border-t border-stone-200", children: [
+      /* @__PURE__ */ jsx("p", { className: "text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1", children: "Acesso \xE0 aplica\xE7\xE3o (Firebase)" }),
+      data.authUid ? /* @__PURE__ */ jsxs("div", { className: "bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5", children: [
+        /* @__PURE__ */ jsxs("p", { className: "text-sm text-emerald-800 font-semibold flex items-center gap-1.5", children: [
+          /* @__PURE__ */ jsx(CheckCircle2, { size: 15 }),
+          " Conta de acesso criada"
+        ] }),
+        /* @__PURE__ */ jsxs("p", { className: "text-xs text-emerald-700 mt-0.5", children: [
+          "Ligada a ",
+          email || "\u2014"
+        ] })
+      ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+        /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-400 mb-2", children: "Ainda n\xE3o tem conta de acesso criada no Firebase. Defina uma palavra-passe inicial (pode ser trocada depois pela pr\xF3pria pessoa) e crie a conta." }),
+        /* @__PURE__ */ jsxs("div", { className: "flex items-end gap-2 mb-2", children: [
+          /* @__PURE__ */ jsx(Field, { label: "Palavra-passe inicial (m\xEDn. 6 caracteres)", children: /* @__PURE__ */ jsx(
+            "input",
+            {
+              value: passwordAcesso,
+              onChange: (e) => setPasswordAcesso(e.target.value),
+              type: "text",
+              className: inputCls,
+              placeholder: "Ex: primeiroacesso2026"
+            }
+          ) }),
+          /* @__PURE__ */ jsx("button", { onClick: criarAcesso, disabled: criandoAcesso, className: "mb-4 px-4 py-2.5 rounded-lg bg-stone-800 text-white text-sm font-semibold hover:bg-stone-900 disabled:opacity-50 shrink-0", children: criandoAcesso ? "A criar\u2026" : acessoCriado ? "Criada \u2713" : "Criar conta" })
+        ] }),
+        erroAcesso && /* @__PURE__ */ jsx("p", { className: "text-red-600 text-xs", children: erroAcesso })
+      ] })
     ] })
   ] });
 }
